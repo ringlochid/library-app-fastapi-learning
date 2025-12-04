@@ -10,6 +10,7 @@ class AuthorBase(BaseModel):
 
 class ReviewBase(BaseModel):
     rating: int
+    reviewer_name : str
     comment: str | None = None
 
     class Config:

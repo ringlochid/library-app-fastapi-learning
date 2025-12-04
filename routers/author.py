@@ -37,10 +37,11 @@ def create_author(author : AuthorCreate, db : Session = Depends(get_db)):
     )
 
     if author.book_ids:
-        stmt_books = select(Book).where(Book.id.in_(author.book_ids))
+        book_ids = set(author.book_ids)
+        stmt_books = select(Book).where(Book.id.in_(book_ids))
         books = db.execute(stmt_books).scalars().all()
 
-        if len(books) != len(author.book_ids):
+        if len(books) != len(book_ids):
             raise HTTPException(status_code=400, detail="At least one book id does not exist.")
 
         new_author.books = list(books)
@@ -60,10 +61,11 @@ def replace_author(author_id: int , new_author : AuthorCreate, db : Session = De
         raise HTTPException(status_code=404, detail="Author not found")
 
     if new_author.book_ids:
-        stat_books = select(Book).where(Book.id.in_(new_author.book_ids))
+        book_ids = set(new_author.book_ids)
+        stat_books = select(Book).where(Book.id.in_(book_ids))
         books = db.execute(stat_books).scalars().all()
 
-        if len(books) != len(new_author.book_ids):
+        if len(books) != len(book_ids):
             raise HTTPException(status_code=400, detail='At least one book id does not exist.')
         old_author.books = list(books)
     else:
@@ -88,10 +90,11 @@ def update_author(author_id: int, new_author: AuthorUpdate, db: Session = Depend
     
     if new_author.book_ids is not None:
         if new_author.book_ids:
-            stmt_books = select(Book).where(Book.id.in_(new_author.book_ids))
+            book_ids = set(new_author.book_ids)
+            stmt_books = select(Book).where(Book.id.in_(book_ids))
             books = db.execute(stmt_books).scalars().all()
 
-            if len(books) != len(new_author.book_ids):
+            if len(books) != len(book_ids):
                 raise HTTPException(status_code=400, detail="At least one book id does not exist")
 
             old_author.books = list(books)

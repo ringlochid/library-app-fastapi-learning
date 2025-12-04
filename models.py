@@ -1,5 +1,5 @@
 from database import Base
-from sqlalchemy import Table, Column, String,Text, Integer, ForeignKey, CheckConstraint
+from sqlalchemy import Table, Column, String,Text, Integer, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -24,7 +24,7 @@ class Book(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     year: Mapped[int | None] = mapped_column(Integer)
 
-    reviews: Mapped[list["Review"]] = relationship("Review", back_populates="book")
+    reviews: Mapped[list["Review"]] = relationship("Review", back_populates="book", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("year IS NULL OR year > 0", name="ck_books_year_positive"),
@@ -49,6 +49,7 @@ class Review(Base):
 
     __table_args__ = (
         CheckConstraint("rating > 0 AND rating < 6", name="ck_reviews_rating_1_5"),
+        UniqueConstraint("book_id", "reviewer_name", name="uq_reviews_book_reviewer"),
     )
 
 

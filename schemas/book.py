@@ -11,12 +11,16 @@ class BookUpdate(BaseModel):
     title: str | None = None
     year: int | None = None
 
-class BookRead(BaseModel):
+
+class BookListRead(BaseModel):
     id: int
     title: str
     year: int | None
     authors: List[AuthorBase] = Field(default_factory=list)
-    reviews: List[ReviewBase] = Field(default_factory=list)
     
     class Config:
         from_attributes = True
+
+
+class BookDetailRead(BookListRead):
+    reviews: List[ReviewBase] = Field(default_factory=list)
