@@ -5,7 +5,7 @@ from .shared import BookBase
 class AuthorCreate(BaseModel):
     name : str
     email: str | None = None
-    book_ids: list[int] | None = None
+    book_ids: list[int] = []
 
 class AuthorUpdate(BaseModel):
     name : str | None
