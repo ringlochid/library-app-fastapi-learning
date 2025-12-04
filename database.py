@@ -5,7 +5,7 @@ from sqlalchemy.orm import (
 
 DATABASEURL = "postgresql+psycopg://postgres:123456@localhost:5432/library-app"
 
-engine = create_engine(DATABASEURL, echo=True, future=True)
+engine = create_engine(DATABASEURL, echo=True, future=True, pool_size=5, max_overflow=10)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
