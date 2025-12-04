@@ -70,3 +70,31 @@ def replace_author(author_id: int , new_author : AuthorCreate, db : Session = De
     db.refresh(old_author)
     return old_author
 
+@router.patch('/{author_id}', response_model=AuthorRead)
+def update_author(author_id: int, new_author: AuthorUpdate, db: Session = Depends(get_db)):
+    stmt = (
+        select(Author)
+        .options(selectinload(Author.books))
+        .where(Author.id == author_id)
+    )
+    old_author = db.execute(stmt).scalar_one_or_none()
+    if not old_author:
+        raise HTTPException(status_code=404, detail="Author not found")
+    
+    if new_author.book_ids is not None:
+        stmt_books = select(Book).where(Book.id.in_(new_author.book_ids))
+        books = db.execute(stmt_books).scalars().all()
+
+        if len(books) != len(new_author.book_ids):
+            raise HTTPException(status_code=400, detail="At least one book id does not exist")
+
+        old_author.books = list(books)
+
+    update_data = new_author.model_dump(exclude={"book_ids"}, exclude_none=True)
+    for key, val in update_data.items():
+        setattr(old_author, key, val)
+
+    db.commit()
+    db.refresh(old_author)
+    return old_author
+
