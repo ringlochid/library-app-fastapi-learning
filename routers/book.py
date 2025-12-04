@@ -5,6 +5,7 @@ from sqlalchemy import select
 from ..models import Author, Book, Review
 from ..database import get_db
 from ..schemas.book import BookCreate, BookRead, BookUpdate
+from ..schemas.review import ReviewCreate, ReviewRead, ReviewUpdate
 
 router = APIRouter(prefix='/books', tags=['books'])
 
@@ -20,7 +21,7 @@ def get_books(db : Session = Depends(get_db)):
 
 
 @router.get('/{book_id}', response_model=BookRead)
-def get_author(book_id: int, db : Session = Depends(get_db)):
+def get_book(book_id: int, db : Session = Depends(get_db)):
     stat = (
         select(Book)
         .options(selectinload(Book.authors))
@@ -29,9 +30,21 @@ def get_author(book_id: int, db : Session = Depends(get_db)):
     )
     book = db.execute(stat).scalar_one_or_none()
     if not book:
-        raise HTTPException(status_code=404, detail="Author not found")
+        raise HTTPException(status_code=404, detail="Book not found")
     return  book
 
+@router.get('/{book_id}/reviews', response_model=List[ReviewRead])
+def get_reviews(book_id: int, db : Session = Depends(get_db)):
+    stat = (
+        select(Book)
+        .options(selectinload(Book.authors))
+        .options(selectinload(Book.reviews))
+        .where(Book.id == book_id)
+    )
+    book = db.execute(stat).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return book.reviews
 
 @router.post('/', response_model=BookRead)
 def create_book(book : BookCreate, db : Session = Depends(get_db)):
@@ -55,6 +68,29 @@ def create_book(book : BookCreate, db : Session = Depends(get_db)):
     db.commit()
     db.refresh(new_book)
     return new_book
+
+@router.post('/{book_id}/reviews', response_model=ReviewRead)
+def create_review(book_id : int, review : ReviewCreate, db : Session = Depends(get_db)):
+    stat_book = (
+        select(Book)
+        .options(selectinload(Book.authors))
+        .options(selectinload(Book.reviews))
+        .where(Book.id == book_id)
+    )
+    book = db.execute(stat_book).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    new_review = Review(
+        book_id = review.book_id,
+        reviewer_name = review.reviewer_name,
+        rating = review.rating,
+        comment = review.comment
+    )
+    db.add(new_review)
+    db.commit()
+    db.refresh(new_review)
+    return new_review
+
 
 @router.put('/{book_id}', response_model=BookRead)
 def replace_book(book_id: int , new_book : BookCreate, db : Session = Depends(get_db)):
@@ -99,16 +135,17 @@ def update_book(book_id: int , new_book : BookUpdate, db : Session = Depends(get
     if not old_book:
         raise HTTPException(status_code=404, detail='Book not found')
 
-    if new_book.author_ids:
-        stmt_authors = select(Author).where(Author.id.in_(new_book.author_ids))
-        authors = db.execute(stmt_authors).scalars().all()
+    if new_book.author_ids is not None:
+        if new_book.author_ids:
+            stmt_authors = select(Author).where(Author.id.in_(new_book.author_ids))
+            authors = db.execute(stmt_authors).scalars().all()
 
-        if len(authors) != len(new_book.author_ids):
-            raise HTTPException(status_code=400, detail="At least one author id does not exist.")
+            if len(authors) != len(new_book.author_ids):
+                raise HTTPException(status_code=400, detail="At least one author id does not exist.")
 
-        old_book.authors = list(authors)
-    else:
-        old_book.authors = []
+            old_book.authors = list(authors)
+        else:
+            old_book.authors = []
 
     update_data = new_book.model_dump(exclude={"author_ids"}, exclude_unset=True)
     for key, val in update_data.items():

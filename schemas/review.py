@@ -15,12 +15,9 @@ class ReviewUpdate(BaseModel):
 
 class ReviewRead(BaseModel):
     id : int
-    book_id : int
     reviewer_name : str
     rating : int
     comment : str | None = None
-
-    book : BookBase
 
     class Config:
         from_attributes = True
