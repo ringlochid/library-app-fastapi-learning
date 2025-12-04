@@ -32,19 +32,25 @@ def get_author(author_id: int, db : Session = Depends(get_db)):
 @router.post('/', response_model=AuthorRead)
 def create_author(author : AuthorCreate, db : Session = Depends(get_db)):
     new_author = Author(
-        name = author.name,
-        email = author.email
+        name=author.name,
+        email=author.email,
     )
+
     if author.book_ids:
-        stat_books = select(Book).where(Book.id.in_(author.book_ids))
-        books = db.execute(stat_books).scalars().all()
+        stmt_books = select(Book).where(Book.id.in_(author.book_ids))
+        books = db.execute(stmt_books).scalars().all()
 
         if len(books) != len(author.book_ids):
-            raise HTTPException(status_code=400, detail='At least one book not match.')
-        db.add(new_author)
-        db.commit()
-        db.refresh(new_author)
-        return new_author
+            raise HTTPException(status_code=400, detail="At least one book id does not exist.")
+
+        new_author.books = list(books)
+    else:
+        new_author.books = []
+
+    db.add(new_author)
+    db.commit()
+    db.refresh(new_author)
+    return new_author
 
 @router.put('/{author_id}', response_model=AuthorRead)
 def replace_author(author_id: int , new_author : AuthorCreate, db : Session = Depends(get_db)):
@@ -58,8 +64,7 @@ def replace_author(author_id: int , new_author : AuthorCreate, db : Session = De
         books = db.execute(stat_books).scalars().all()
 
         if len(books) != len(new_author.book_ids):
-            raise HTTPException(status_code=500, detail='At least one book not match.')
-        
+            raise HTTPException(status_code=400, detail='At least one book id does not exist.')
         old_author.books = list(books)
     else:
         old_author.books = []
@@ -82,15 +87,18 @@ def update_author(author_id: int, new_author: AuthorUpdate, db: Session = Depend
         raise HTTPException(status_code=404, detail="Author not found")
     
     if new_author.book_ids is not None:
-        stmt_books = select(Book).where(Book.id.in_(new_author.book_ids))
-        books = db.execute(stmt_books).scalars().all()
+        if new_author.book_ids:
+            stmt_books = select(Book).where(Book.id.in_(new_author.book_ids))
+            books = db.execute(stmt_books).scalars().all()
 
-        if len(books) != len(new_author.book_ids):
-            raise HTTPException(status_code=400, detail="At least one book id does not exist")
+            if len(books) != len(new_author.book_ids):
+                raise HTTPException(400, "At least one book id does not exist")
 
-        old_author.books = list(books)
+            old_author.books = list(books)
+        else:
+            old_author.books = []
 
-    update_data = new_author.model_dump(exclude={"book_ids"}, exclude_none=True)
+    update_data = new_author.model_dump(exclude={"book_ids"}, exclude_unset=True)
     for key, val in update_data.items():
         setattr(old_author, key, val)
 
