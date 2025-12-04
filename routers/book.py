@@ -5,7 +5,7 @@ from sqlalchemy import select
 from ..models import Author, Book, Review
 from ..database import get_db
 from ..schemas.book import BookCreate, BookRead, BookUpdate
-from ..schemas.review import ReviewCreate, ReviewRead, ReviewUpdate
+from ..schemas.review import ReviewCreate, ReviewRead
 
 router = APIRouter(prefix='/books', tags=['books'])
 

@@ -106,3 +106,11 @@ def update_author(author_id: int, new_author: AuthorUpdate, db: Session = Depend
     db.refresh(old_author)
     return old_author
 
+@router.delete('/{author_id}', status_code=204)
+def del_author(author_id, db : Session = Depends(get_db)):
+    stat = select(Author).where(Author.id == author_id)
+    author = db.execute(stat).scalar_one_or_none()
+    if not author:
+        raise HTTPException(status_code=400, detail='author not found')
+    db.delete(author)
+    db.commit()
