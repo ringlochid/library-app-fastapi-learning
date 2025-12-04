@@ -3,18 +3,18 @@ from pydantic import BaseModel, Field
 from .shared import ReviewBase, AuthorBase
 
 class BookCreate(BaseModel):
-    title : str
-    year : int | None = None
-    author_ids : list[int] = []
+    title: str
+    year: int | None = None
+    author_ids: list[int] = Field(default_factory=list)
 
 class BookUpdate(BaseModel):
-    title : str | None
-    year : int | None
-    author_ids : list | None = None
+    title: str | None = None
+    year: int | None = None
 
 class BookRead(BaseModel):
-    title : str
-    year : int | None
+    id: int
+    title: str
+    year: int | None
     authors: List[AuthorBase] = Field(default_factory=list)
     reviews: List[ReviewBase] = Field(default_factory=list)
     

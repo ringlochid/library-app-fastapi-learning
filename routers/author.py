@@ -6,7 +6,7 @@ from ..models import Author, Book
 from ..database import get_db
 from ..schemas.author import AuthorCreate, AuthorRead, AuthorUpdate
 
-router = APIRouter(prefix='/author', tags=['authors'])
+router = APIRouter(prefix="/authors", tags=["authors"])
 
 @router.get('/', response_model=List[AuthorRead])
 def get_authors(db : Session = Depends(get_db)):
@@ -57,7 +57,7 @@ def replace_author(author_id: int , new_author : AuthorCreate, db : Session = De
     stat = select(Author).options(selectinload(Author.books)).where(Author.id == author_id)
     old_author = db.execute(stat).scalar_one_or_none()
     if not old_author:
-        raise HTTPException(status_code=404, detail='Autahor not found')
+        raise HTTPException(status_code=404, detail="Author not found")
 
     if new_author.book_ids:
         stat_books = select(Book).where(Book.id.in_(new_author.book_ids))
@@ -92,7 +92,7 @@ def update_author(author_id: int, new_author: AuthorUpdate, db: Session = Depend
             books = db.execute(stmt_books).scalars().all()
 
             if len(books) != len(new_author.book_ids):
-                raise HTTPException(400, "At least one book id does not exist")
+                raise HTTPException(status_code=400, detail="At least one book id does not exist")
 
             old_author.books = list(books)
         else:

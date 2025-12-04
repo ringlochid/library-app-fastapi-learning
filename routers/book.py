@@ -10,12 +10,20 @@ from ..schemas.review import ReviewCreate, ReviewRead, ReviewUpdate
 router = APIRouter(prefix='/books', tags=['books'])
 
 @router.get('/', response_model=List[BookRead])
-def get_books(db : Session = Depends(get_db)):
+def get_books(author_id: int | None = None, db: Session = Depends(get_db)):
     stat = (
         select(Book)
         .options(selectinload(Book.authors))
         .options(selectinload(Book.reviews))
     )
+
+    if author_id is not None:
+        stat = (
+            stat.join(Book.authors)
+            .where(Author.id == author_id)
+            .distinct()
+        )
+
     books = db.execute(stat).scalars().all()
     return books
 
@@ -81,10 +89,10 @@ def create_review(book_id : int, review : ReviewCreate, db : Session = Depends(g
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     new_review = Review(
-        book_id = review.book_id,
-        reviewer_name = review.reviewer_name,
-        rating = review.rating,
-        comment = review.comment
+        book_id=book_id,
+        reviewer_name=review.reviewer_name,
+        rating=review.rating,
+        comment=review.comment,
     )
     db.add(new_review)
     db.commit()
@@ -135,19 +143,7 @@ def update_book(book_id: int , new_book : BookUpdate, db : Session = Depends(get
     if not old_book:
         raise HTTPException(status_code=404, detail='Book not found')
 
-    if new_book.author_ids is not None:
-        if new_book.author_ids:
-            stmt_authors = select(Author).where(Author.id.in_(new_book.author_ids))
-            authors = db.execute(stmt_authors).scalars().all()
-
-            if len(authors) != len(new_book.author_ids):
-                raise HTTPException(status_code=400, detail="At least one author id does not exist.")
-
-            old_book.authors = list(authors)
-        else:
-            old_book.authors = []
-
-    update_data = new_book.model_dump(exclude={"author_ids"}, exclude_unset=True)
+    update_data = new_book.model_dump(exclude_unset=True)
     for key, val in update_data.items():
         setattr(old_book, key, val)
 

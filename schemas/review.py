@@ -1,23 +1,20 @@
-from pydantic import BaseModel
-from .shared import BookBase
+from pydantic import BaseModel, Field
 
 class ReviewCreate(BaseModel):
-    book_id : int
-    reviewer_name : str
-    rating : int
-    comment : str | None = None
+    reviewer_name: str
+    rating: int = Field(..., ge=1, le=5)
+    comment: str | None = None
 
 class ReviewUpdate(BaseModel):
-    book_id : int | None = None
-    reviewer_name : str | None = None
-    rating : int | None = None
-    comment : str | None = None
+    reviewer_name: str | None = None
+    rating: int | None = Field(None, ge=1, le=5)
+    comment: str | None = None
 
 class ReviewRead(BaseModel):
-    id : int
-    reviewer_name : str
-    rating : int
-    comment : str | None = None
+    id: int
+    reviewer_name: str
+    rating: int
+    comment: str | None = None
 
     class Config:
         from_attributes = True
