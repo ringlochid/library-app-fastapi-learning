@@ -2,9 +2,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
-from ..models import Author, Book
-from ..database import get_db
-from ..schemas.author import AuthorCreate, AuthorRead, AuthorUpdate
+from models import Author, Book
+from database import get_db
+from schemas.author import AuthorCreate, AuthorRead, AuthorUpdate
 
 router = APIRouter(prefix="/authors", tags=["authors"])
 
@@ -111,6 +111,6 @@ def del_author(author_id, db : Session = Depends(get_db)):
     stat = select(Author).where(Author.id == author_id)
     author = db.execute(stat).scalar_one_or_none()
     if not author:
-        raise HTTPException(status_code=400, detail='author not found')
+        raise HTTPException(status_code=404, detail='author not found')
     db.delete(author)
     db.commit()

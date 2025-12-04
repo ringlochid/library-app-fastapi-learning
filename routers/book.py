@@ -2,10 +2,10 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
-from ..models import Author, Book, Review
-from ..database import get_db
-from ..schemas.book import BookCreate, BookRead, BookUpdate
-from ..schemas.review import ReviewCreate, ReviewRead
+from models import Author, Book, Review
+from database import get_db
+from schemas.book import BookCreate, BookRead, BookUpdate
+from schemas.review import ReviewCreate, ReviewRead
 
 router = APIRouter(prefix='/books', tags=['books'])
 
@@ -99,7 +99,6 @@ def create_review(book_id : int, review : ReviewCreate, db : Session = Depends(g
     db.refresh(new_review)
     return new_review
 
-
 @router.put('/{book_id}', response_model=BookRead)
 def replace_book(book_id: int , new_book : BookCreate, db : Session = Depends(get_db)):
     stat = (
@@ -129,6 +128,31 @@ def replace_book(book_id: int , new_book : BookCreate, db : Session = Depends(ge
     db.commit()
     db.refresh(old_book)
     return old_book
+
+@router.put('/{book_id}/authors', response_model=BookRead)
+def update_author_list(book_id : int, new_author_list : list[int], db : Session = Depends(get_db)):
+    stat_book = (
+        select(Book)
+        .options(selectinload(Book.authors))
+        .options(selectinload(Book.reviews))
+        .where(Book.id == book_id)
+        )
+    book = db.execute(stat_book).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404, detail='Cant find the book')
+    if not new_author_list:
+        book.authors = []
+    else:
+        stmt_authors = select(Author).where(Author.id.in_(new_author_list))
+        authors = db.execute(stmt_authors).scalars().all()
+
+        if len(new_author_list) != len(authors):
+            raise HTTPException(status_code=400, detail="At least one author id does not exist.")
+        
+        book.authors = list(authors)
+    db.commit()
+    db.refresh(book)
+    return book
 
 @router.patch('/{book_id}', response_model=BookRead)
 def update_book(book_id: int , new_book : BookUpdate, db : Session = Depends(get_db)):

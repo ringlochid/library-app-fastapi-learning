@@ -3,7 +3,7 @@ from sqlalchemy.orm import (
     sessionmaker, declarative_base
 )
 
-DATABASEURL = "postgresql+psycopg://postgre:123456@localhost:5432/library_app"
+DATABASEURL = "postgresql+psycopg://postgres:123456@localhost:5432/library-app"
 
 engine = create_engine(DATABASEURL, echo=True)
 

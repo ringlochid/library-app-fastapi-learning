@@ -40,7 +40,7 @@ class Review(Base):
     __tablename__ = "reviews"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    book_id: Mapped[int] = mapped_column(ForeignKey("books.id"), ondelete="CASCADE", nullable=False)
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"), nullable=False)
     reviewer_name: Mapped[str] = mapped_column(String(50), nullable=False)
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text)
