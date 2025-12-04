@@ -10,7 +10,7 @@ class BookCreate(BaseModel):
 class BookUpdate(BaseModel):
     title : str | None
     year : int | None
-    author_ids : list | None = []
+    author_ids : list | None = None
 
 class BookRead(BaseModel):
     title : str
