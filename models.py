@@ -1,5 +1,5 @@
 from database import Base
-from sqlalchemy import Table, Column, String,Text, Integer, ForeignKey, CheckConstraint, UniqueConstraint
+from sqlalchemy import Table, Column, String, Text, Integer, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -16,18 +16,29 @@ class Author(Base):
         back_populates="authors",
     )
 
+    __table_args__ = (
+        CheckConstraint("email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'", name='ck_authors_email_format'),
+    )
+
 
 class Book(Base):
     __tablename__ = "books"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
-    year: Mapped[int | None] = mapped_column(Integer)
+    year: Mapped[int | None] = mapped_column(Integer, index=True)
+    book_isbn : Mapped[str | None] = mapped_column(String(14), index=True)
+    genre_name : Mapped[str | None] = mapped_column(String(127), index=True)
+    description : Mapped[str | None] = mapped_column(Text)
 
     reviews: Mapped[list["Review"]] = relationship("Review", back_populates="book", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("year IS NULL OR year > 0", name="ck_books_year_positive"),
+        CheckConstraint(
+                            "book_isbn IS NULL OR char_length(book_isbn) IN (10, 13)",
+                            name="ck_book_isbn_length",
+                        ),
     )
 
     # many-to-many: books → authors
