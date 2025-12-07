@@ -1,7 +1,7 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import select
+from sqlalchemy import func, or_, select, text
 from models import Author, Book, Review
 from database import get_db
 from schemas.book import BookCreate, BookDetailRead, BookListRead, BookUpdate
@@ -10,20 +10,52 @@ from schemas.review import ReviewCreate, ReviewRead
 router = APIRouter(prefix='/books', tags=['books'])
 
 @router.get('/', response_model=List[BookListRead])
-def get_books(author_id: int | None = None, db: Session = Depends(get_db)):
-    stat = (
+def get_books(
+    q: str | None = Query(None, description="Full-text query"),
+    title: str | None = Query(None, description="Exact title filter"),
+    isbn: str | None = Query(None, description="Exact ISBN filter"),
+    author_id: int | None = Query(None, description="Filter by author id"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    ):
+
+    stmt = (
         select(Book)
         .options(selectinload(Book.authors))
     )
 
-    if author_id is not None:
-        stat = (
-            stat.join(Book.authors)
-            .where(Author.id == author_id)
-            .distinct()
+    if title:
+        stmt = stmt.where(Book.title == title)
+    if isbn:
+        stmt = stmt.where(Book.book_isbn == isbn)
+    if author_id:
+        stmt = stmt.where(Book.authors.any(Author.id == author_id))
+    
+    if q:
+        tsq = func.websearch_to_tsquery("english", q)
+        fts_score = func.ts_rank(Book.search_tsv, tsq)
+        title_sim = func.similarity(Book.title, q)
+        author_sim = func.coalesce(func.max(func.similarity(Author.name, q)), 0.0)
+        total = 0.70 * fts_score + 0.20 * title_sim + 0.10 * author_sim
+        stmt = (
+            stmt
+            .join(Book.authors, isouter=True)
+            .where(or_(Book.search_tsv.op("@@")(tsq), Book.title.op("%")(q), Author.name.op("%")(q)))
+            .group_by(Book.id)
+            .add_columns(
+                fts_score.label("fts_score"),
+                title_sim.label("title_sim"),
+                author_sim.label("author_sim"),
+                total.label("total_score"),
+            )
+            .order_by(total.desc(), Book.title, Book.id)
         )
-
-    books = db.execute(stat).scalars().all()
+    else:
+        stmt = stmt.order_by(Book.title, Book.id)
+    
+    stmt = stmt.limit(limit).offset(offset)
+    books = db.execute(stmt).scalars().unique().all()
     return books
 
 
@@ -55,8 +87,11 @@ def get_reviews(book_id: int, db : Session = Depends(get_db)):
 @router.post('/', response_model=BookDetailRead)
 def create_book(book : BookCreate, db : Session = Depends(get_db)):
     new_book = Book(
-        title = book.title,
-        year = book.year
+        title=book.title,
+        year=book.year,
+        book_isbn=book.book_isbn,
+        genre_name=book.genre_name,
+        description=book.description,
     )
 
     if book.author_ids:
@@ -130,6 +165,9 @@ def replace_book(book_id: int , new_book : BookCreate, db : Session = Depends(ge
     
     old_book.title = new_book.title
     old_book.year = new_book.year
+    old_book.book_isbn = new_book.book_isbn
+    old_book.genre_name = new_book.genre_name
+    old_book.description = new_book.description
     # old_book.reviews = []
     db.commit()
     db.refresh(old_book)
