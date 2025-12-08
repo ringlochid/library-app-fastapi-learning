@@ -1,0 +1,140 @@
+import hashlib
+import json
+from typing import Any, Iterable
+
+from redis import Redis, from_url
+
+_redis: Redis | None = None
+DEFAULT_TTL = 600
+
+def _client() -> Redis | None:
+    try:
+        return get_redis()
+    except Exception:
+        return None
+
+def get_redis() -> Redis:
+    global _redis
+    if _redis is None:
+        _redis = from_url(
+            "redis://localhost:6379/0",
+            decode_responses=True,
+        )
+    return _redis
+
+def normalize_params(params: dict) -> tuple[dict, str]:
+    clean = {k: v for k, v in params.items() if v is not None}
+    payload = json.dumps(clean, sort_keys=True, separators=(",", ":"))
+    return clean, payload
+
+def make_list_key(prefix: str, params: dict, version: int = 1) -> str:
+    _, payload = normalize_params(params)
+    h = hashlib.sha1(payload.encode()).hexdigest()[:16]  # trim to 16
+    return f"{prefix}:v{version}:{h}"
+
+def make_list_key_with_payload(prefix: str, params: dict, version: int = 1) -> tuple[str, str]:
+    clean, payload = normalize_params(params)
+    h = hashlib.sha1(payload.encode()).hexdigest()[:16]
+    return f"{prefix}:v{version}:{h}", payload
+
+def make_books_list_key(params: dict, version: int = 1) -> tuple[str, str]:
+    return make_list_key_with_payload("books:list", params, version)
+
+def make_authors_list_key(params: dict, version: int = 1) -> tuple[str, str]:
+    return make_list_key_with_payload("authors:list", params, version)
+
+def make_book_key(book_id: int) -> str:
+    return f"book:{book_id}"
+
+def make_author_key(author_id : int) -> str:
+    return f"author:{author_id}"
+
+def make_author_books_key(author_id: int) -> str:
+    return f"author:{author_id}:books"
+
+def make_reviews_key(book_id: int) -> str:
+    return f"book:{book_id}:reviews"
+
+def cache_book(book_id: int, book_data: dict, ttl: int = DEFAULT_TTL):
+    r = _client()
+    if not r:
+        return
+    r.set(make_book_key(book_id), json.dumps(book_data), ex=ttl)
+
+def get_book(book_id: int) -> dict | None:
+    r = _client()
+    if not r:
+        return None
+    raw = r.get(make_book_key(book_id))
+    return json.loads(raw) if raw else None
+
+def cache_author(author_id: int, author_data: dict, ttl: int = DEFAULT_TTL):
+    r = _client()
+    if not r:
+        return
+    r.set(make_author_key(author_id), json.dumps(author_data), ex=ttl)
+
+def get_author(author_id: int) -> dict | None:
+    r = _client()
+    if not r:
+        return None
+    raw = r.get(make_author_key(author_id))
+    return json.loads(raw) if raw else None
+
+def cache_list(key: str, data: Any, ttl: int = DEFAULT_TTL):
+    r = _client()
+    if not r:
+        return
+    r.set(key, json.dumps(data), ex=ttl)
+
+def get_list(key: str) -> Any | None:
+    r = _client()
+    if not r:
+        return None
+    raw = r.get(key)
+    return json.loads(raw) if raw else None
+
+def cache_list_with_params(key: str, data: Any, params_payload: str, ttl: int = DEFAULT_TTL):
+    """Store list data alongside normalized params to guard against collisions."""
+    cache_list(key, {"data": data, "_params": params_payload}, ttl=ttl)
+
+
+def get_list_with_params(key: str, expected_params_payload: str) -> Any | None:
+    """Return cached list only if params match; otherwise treat as miss."""
+    cached = get_list(key)
+    if isinstance(cached, dict) and cached.get("_params") == expected_params_payload:
+        return cached.get("data")
+    return None
+
+def link_book_to_authors(book_id: int, author_ids: Iterable[int]):
+    r = _client()
+    if not r:
+        return
+    for aid in author_ids:
+        r.sadd(make_author_books_key(aid), book_id)
+
+def get_books_for_author(author_id: int) -> set[int]:
+    r = _client()
+    if not r:
+        return set()
+    return {int(bid) for bid in r.smembers(make_author_books_key(author_id))}
+
+def invalidate_book(book_id: int):
+    r = _client()
+    if not r:
+        return
+    r.delete(make_book_key(book_id))
+    r.delete(make_reviews_key(book_id))
+    r.delete(f"book:{book_id}:authors")
+
+def invalidate_author(author_id: int):
+    r = _client()
+    if not r:
+        return
+    r.delete(make_author_key(author_id))
+    author_books_key = make_author_books_key(author_id)
+    book_ids = r.smembers(author_books_key)
+    if book_ids:
+        keys_to_delete = [make_book_key(int(bid)) for bid in book_ids]
+        r.delete(*keys_to_delete)
+    r.delete(author_books_key)
