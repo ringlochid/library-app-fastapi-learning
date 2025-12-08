@@ -26,7 +26,7 @@ class Book(Base):
     __tablename__ = "books"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str] = mapped_column(String(), nullable=False)
     year: Mapped[int | None] = mapped_column(Integer, index=True)
     book_isbn : Mapped[str | None] = mapped_column(String(14), index=True)
     genre_name : Mapped[str | None] = mapped_column(String(127), index=True)

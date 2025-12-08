@@ -102,7 +102,8 @@ def get_books(
         last_score = data["score"]
         last_id = data["id"]
 
-        stmt = stmt.where(
+        # use HAVING because total uses aggregated author similarity
+        stmt = stmt.having(
             or_(
                 total < last_score,
                 and_(total == last_score, Book.id > last_id),#handle edge cases
