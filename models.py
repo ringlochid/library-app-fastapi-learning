@@ -3,7 +3,6 @@ from database import Base
 from sqlalchemy import Computed, Table, Column, String, Text, Integer, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-
 class Author(Base):
     __tablename__ = "authors"
 
