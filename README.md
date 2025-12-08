@@ -4,8 +4,8 @@ Small FastAPI project for managing authors, books, and reviews with PostgreSQL +
 
 ## Quickstart
 - Python 3.11+ recommended. Install deps: `pip install fastapi uvicorn sqlalchemy psycopg[binary]`.
-- Configure database URL (Postgres) via env var, or edit `database.py`:
-  - Default: `postgresql+psycopg://postgre:123456@localhost:5432/library-app`
+- Configure database/redis URLs via env vars (`DATABASE_URL`, `REDIS_HOST`, etc.). A local `.env` is loaded automatically if present:
+  - Default DB URL fallback: `postgresql+psycopg://postgres:123456@localhost:5432/library_app`
   - Ensure the user/password/database exist, or override with your own credentials.
 - Initialize tables: `python -c "import main"` (or let FastAPI import create them on first run).
 - Run the API: `uvicorn main:app --reload`.
