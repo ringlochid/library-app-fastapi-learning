@@ -1,6 +1,20 @@
 from typing import List
 from pydantic import BaseModel, Field
 from .shared import ReviewBase, AuthorBase
+from enum import Enum
+
+class SortField(str, Enum):
+    by_similarity = "similarity"
+    by_title = "title"
+    by_year = "year"
+
+class SortDirection(str, Enum):
+    asc = "asc"
+    desc = "desc"
+
+class BookSortControl(BaseModel):
+    sort_field : SortField | None
+    sort_direction : SortDirection | None
 
 class BookCreate(BaseModel):
     title: str

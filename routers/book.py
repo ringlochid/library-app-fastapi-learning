@@ -1,10 +1,11 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import asc, desc, func, or_, select, text
 from models import Author, Book, Review
 from database import get_db
-from schemas.book import BookCreate, BookDetailRead, BookListRead, BookUpdate
+from dependencies import parse_sort
+from schemas.book import BookCreate, BookDetailRead, BookListRead, BookUpdate, BookSortControl, SortField, SortDirection
 from schemas.review import ReviewCreate, ReviewRead
 
 router = APIRouter(prefix='/books', tags=['books'])
@@ -15,11 +16,13 @@ def get_books(
     title: str | None = Query(None, description="Exact title filter"),
     isbn: str | None = Query(None, description="Exact ISBN filter"),
     author_id: int | None = Query(None, description="Filter by author id"),
+    before : int | None = Query(None, description="Filter by Year(before)"),
+    after : int | None = Query(None, description="Filter by Year(after)"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    sort : List[BookSortControl] = Depends(parse_sort),
     db: Session = Depends(get_db),
     ):
-
     stmt = (
         select(Book)
         .options(selectinload(Book.authors))
@@ -31,13 +34,17 @@ def get_books(
         stmt = stmt.where(Book.book_isbn == isbn)
     if author_id:
         stmt = stmt.where(Book.authors.any(Author.id == author_id))
+    if before:
+        stmt = stmt.where(Book.year <= before)
+    if after:
+        stmt = stmt.where(Book.year >= after)
     
     if q:
         tsq = func.websearch_to_tsquery("english", q)
         fts_score = func.ts_rank(Book.search_tsv, tsq)
         title_sim = func.similarity(Book.title, q)
         author_sim = func.coalesce(func.max(func.similarity(Author.name, q)), 0.0)
-        total = 0.70 * fts_score + 0.20 * title_sim + 0.10 * author_sim
+        total = 0.6 * fts_score + 0.25 * title_sim + 0.15 * author_sim
         stmt = (
             stmt
             .join(Book.authors, isouter=True)
@@ -49,10 +56,22 @@ def get_books(
                 author_sim.label("author_sim"),
                 total.label("total_score"),
             )
-            .order_by(total.desc(), Book.title, Book.id)
         )
-    else:
-        stmt = stmt.order_by(Book.title, Book.id)
+    
+    for s in sort:
+        if s.sort_field is SortField.by_similarity:
+            if not q:
+                raise HTTPException(status_code=400, detail='Only work with q')
+            col = text("total_score")
+        elif s.sort_direction is SortField.by_title:
+            col = Book.title
+        elif s.sort_field is SortField.by_year:
+            col = Book.year
+        else:
+            continue
+        stmt = stmt.order_by(
+            asc(col) if s.sort_direction is SortDirection.asc else desc(col)
+        )
     
     stmt = stmt.limit(limit).offset(offset)
     books = db.execute(stmt).scalars().unique().all()
