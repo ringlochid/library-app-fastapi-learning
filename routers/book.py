@@ -1,16 +1,17 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import asc, desc, func, or_, select, text
+from sqlalchemy import and_, asc, desc, func, or_, select, text
 from models import Author, Book, Review
 from database import get_db
 from dependencies import parse_sort
-from schemas.book import BookCreate, BookDetailRead, BookListRead, BookUpdate, BookSortControl, SortField, SortDirection
+from schemas.book import BookCreate, BookDetailRead, BookListRead, BookUpdate, BookSortControl, SortField, SortDirection, PaginatedBooks
 from schemas.review import ReviewCreate, ReviewRead
+from helpers import encode_cursor, decode_cursor
 
 router = APIRouter(prefix='/books', tags=['books'])
 
-@router.get('/', response_model=List[BookListRead])
+@router.get('/', response_model=PaginatedBooks)
 def get_books(
     q: str | None = Query(None, description="Full-text query"),
     title: str | None = Query(None, description="Exact title filter"),
@@ -18,8 +19,9 @@ def get_books(
     author_id: int | None = Query(None, description="Filter by author id"),
     before : int | None = Query(None, description="Filter by Year(before)"),
     after : int | None = Query(None, description="Filter by Year(after)"),
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100, description="Pagination limit"),
+    offset: int | None =  Query(None, description="Work when no cursor"),
+    cursor: str | None = Query(None, description="Pagination cursor"),
     sort : List[BookSortControl] = Depends(parse_sort),
     db: Session = Depends(get_db),
     ):
@@ -58,25 +60,87 @@ def get_books(
             )
         )
     
+    order_exprs: list = []
+
     for s in sort:
         if s.sort_field is SortField.by_similarity:
             if not q:
-                raise HTTPException(status_code=400, detail='Only work with q')
-            col = text("total_score")
-        elif s.sort_direction is SortField.by_title:
+                raise HTTPException(
+                    status_code=400,
+                    detail="by_similarity only works with q",
+                )
+            col = total
+        elif s.sort_field is SortField.by_title:
             col = Book.title
         elif s.sort_field is SortField.by_year:
             col = Book.year
         else:
             continue
-        stmt = stmt.order_by(
+
+        order_exprs.append(
             asc(col) if s.sort_direction is SortDirection.asc else desc(col)
         )
-    
-    stmt = stmt.limit(limit).offset(offset)
-    books = db.execute(stmt).scalars().unique().all()
-    return books
 
+    if q and not order_exprs:
+        order_exprs.append(desc(total))
+
+    order_exprs.append(Book.id.asc())
+    stmt = stmt.order_by(*order_exprs)
+
+    primary = sort[0] if sort else None
+    by_similarity = primary and primary.sort_field is SortField.by_similarity
+
+    if cursor is not None and offset is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot use both cursor and offset",
+        )
+
+    # cursor keyset for similarity sort
+    if cursor and by_similarity:
+        data = decode_cursor(cursor)
+        last_score = data["score"]
+        last_id = data["id"]
+
+        stmt = stmt.where(
+            or_(
+                total < last_score,
+                and_(total == last_score, Book.id > last_id),#handle edge cases
+            )
+        )
+    elif cursor and not by_similarity:
+        raise HTTPException(
+            status_code=400,
+            detail="cursor pagination is only supported for by_similarity sort",
+        )
+
+    # offset when no cursor
+    if offset is not None and cursor is None:
+        stmt = stmt.offset(offset)
+
+    #check if there's a next page
+    stmt = stmt.limit(limit + 1)
+    rows = db.execute(stmt).unique().all()
+
+    items_rows = rows[:limit]
+    has_next = len(rows) > limit
+
+    books = [r[0] for r in items_rows]
+
+    next_cursor = None
+    if has_next and by_similarity:
+        last_row = items_rows[-1]
+        last_book: Book = last_row[0]
+        last_total_score = last_row[-1]   # total_score is last selected column
+
+        next_cursor = encode_cursor(
+            {"id": last_book.id, "score": float(last_total_score)}
+        )
+
+    return PaginatedBooks(
+        items=books,   # type: ignore
+        next_cursor=next_cursor,
+    )
 
 @router.get('/{book_id}', response_model=BookDetailRead)
 def get_book(book_id: int, db : Session = Depends(get_db)):

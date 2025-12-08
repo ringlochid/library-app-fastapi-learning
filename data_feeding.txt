@@ -1,0 +1,471 @@
+{
+  "authors": [
+    { "name": "Harper Lee", "email": "harper.lee@example.com", "book_ids": [] },
+    { "name": "George Orwell", "email": "george.orwell@example.com", "book_ids": [] },
+    { "name": "F. Scott Fitzgerald", "email": "fscott.fitzgerald@example.com", "book_ids": [] },
+    { "name": "Jane Austen", "email": "jane.austen@example.com", "book_ids": [] },
+    { "name": "J.R.R. Tolkien", "email": "jrr.tolkien@example.com", "book_ids": [] },
+    { "name": "J.K. Rowling", "email": "jk.rowling@example.com", "book_ids": [] },
+    { "name": "Leo Tolstoy", "email": "leo.tolstoy@example.com", "book_ids": [] },
+    { "name": "Mark Twain", "email": "mark.twain@example.com", "book_ids": [] },
+    { "name": "Mary Shelley", "email": "mary.shelley@example.com", "book_ids": [] },
+    { "name": "Fyodor Dostoevsky", "email": "fyodor.dostoevsky@example.com", "book_ids": [] },
+    { "name": "Gabriel Garcia Marquez", "email": "gabriel.garcia.marquez@example.com", "book_ids": [] },
+    { "name": "Franz Kafka", "email": "franz.kafka@example.com", "book_ids": [] },
+    { "name": "Ernest Hemingway", "email": "ernest.hemingway@example.com", "book_ids": [] },
+    { "name": "Virginia Woolf", "email": "virginia.woolf@example.com", "book_ids": [] },
+    { "name": "Agatha Christie", "email": "agatha.christie@example.com", "book_ids": [] },
+    { "name": "C.S. Lewis", "email": "cs.lewis@example.com", "book_ids": [] },
+    { "name": "Arthur Conan Doyle", "email": "arthur.conan.doyle@example.com", "book_ids": [] },
+    { "name": "Isaac Asimov", "email": "isaac.asimov@example.com", "book_ids": [] },
+    { "name": "Philip K. Dick", "email": "philip.k.dick@example.com", "book_ids": [] },
+    { "name": "Ursula K. Le Guin", "email": "ursula.le.guin@example.com", "book_ids": [] },
+    { "name": "Neil Gaiman", "email": "neil.gaiman@example.com", "book_ids": [] },
+    { "name": "Margaret Atwood", "email": "margaret.atwood@example.com", "book_ids": [] },
+    { "name": "Kazuo Ishiguro", "email": "kazuo.ishiguro@example.com", "book_ids": [] },
+    { "name": "Brandon Sanderson", "email": "brandon.sanderson@example.com", "book_ids": [] },
+    { "name": "N.K. Jemisin", "email": "nk.jemisin@example.com", "book_ids": [] }
+  ],
+  "books": [
+    {
+      "title": "To Kill a Mockingbird",
+      "year": 1960,
+      "book_isbn": "9780061120084",
+      "genre_name": "Literary Fiction",
+      "description": "In a small Southern town, a young girl watches her lawyer father defend a Black man wrongly accused of a crime, confronting racism and moral courage.",
+      "author_ids": [1]
+    },
+    {
+      "title": "Go Set a Watchman",
+      "year": 2015,
+      "book_isbn": "9780062409850",
+      "genre_name": "Literary Fiction",
+      "description": "Scout returns to her hometown as an adult and is forced to re-examine her memories, ideals, and her relationship with her father.",
+      "author_ids": [1]
+    },
+    {
+      "title": "1984",
+      "year": 1949,
+      "book_isbn": "9780451524935",
+      "genre_name": "Dystopian",
+      "description": "A man in a totalitarian state quietly rebels as the Party rewrites history, monitors thought, and turns language into a weapon.",
+      "author_ids": [2]
+    },
+    {
+      "title": "Animal Farm",
+      "year": 1945,
+      "book_isbn": "9780451526342",
+      "genre_name": "Political Satire",
+      "description": "Farm animals overthrow their human owner, only to watch their revolution twist into a new tyranny under the pigs.",
+      "author_ids": [2]
+    },
+    {
+      "title": "The Great Gatsby",
+      "year": 1925,
+      "book_isbn": "9780743273565",
+      "genre_name": "Classic",
+      "description": "A mysterious millionaire pursues a lost love as Jazz Age excess, longing, and illusion collide on Long Island.",
+      "author_ids": [3]
+    },
+    {
+      "title": "Tender Is the Night",
+      "year": 1934,
+      "book_isbn": "9780684801544",
+      "genre_name": "Literary Fiction",
+      "description": "A glamorous couple in the French Riviera gradually unravel as charm, money, and mental illness pull them apart.",
+      "author_ids": [3]
+    },
+    {
+      "title": "Pride and Prejudice",
+      "year": 1813,
+      "book_isbn": "9780141439518",
+      "genre_name": "Romance",
+      "description": "Elizabeth Bennet clashes and then slowly falls in love with the reserved Mr. Darcy amid family pressures and social expectations.",
+      "author_ids": [4]
+    },
+    {
+      "title": "Sense and Sensibility",
+      "year": 1811,
+      "book_isbn": "9780141439662",
+      "genre_name": "Romance",
+      "description": "Two sisters navigate heartbreak and financial hardship, one led by reason and the other by passion.",
+      "author_ids": [4]
+    },
+    {
+      "title": "Emma",
+      "year": 1815,
+      "book_isbn": "9780141439587",
+      "genre_name": "Romance",
+      "description": "A rich young woman enjoys meddling in the love lives of others until her own feelings surprise her.",
+      "author_ids": [4]
+    },
+    {
+      "title": "The Hobbit",
+      "year": 1937,
+      "book_isbn": "9780261103344",
+      "genre_name": "Fantasy",
+      "description": "A reluctant hobbit is dragged into an adventure with a company of dwarves to reclaim a stolen mountain kingdom.",
+      "author_ids": [5]
+    },
+    {
+      "title": "The Fellowship of the Ring",
+      "year": 1954,
+      "book_isbn": "9780261102354",
+      "genre_name": "Fantasy",
+      "description": "A young hobbit inherits a cursed ring and joins a fellowship tasked with taking it into the heart of enemy territory.",
+      "author_ids": [5]
+    },
+    {
+      "title": "The Two Towers",
+      "year": 1954,
+      "book_isbn": "9780261102361",
+      "genre_name": "Fantasy",
+      "description": "The fellowship is scattered as war sweeps across Middle-earth and the ringbearer continues his dangerous journey.",
+      "author_ids": [5]
+    },
+    {
+      "title": "The Return of the King",
+      "year": 1955,
+      "book_isbn": "9780261102378",
+      "genre_name": "Fantasy",
+      "description": "Armies clash for the fate of Middle-earth while one small hobbit climbs toward the fires of Mount Doom.",
+      "author_ids": [5]
+    },
+    {
+      "title": "Harry Potter and the Philosopher's Stone",
+      "year": 1997,
+      "book_isbn": "9780747532699",
+      "genre_name": "Fantasy",
+      "description": "An orphan discovers he is a wizard and finds friendship and danger at a magical school.",
+      "author_ids": [6]
+    },
+    {
+      "title": "Harry Potter and the Chamber of Secrets",
+      "year": 1998,
+      "book_isbn": "9780747538493",
+      "genre_name": "Fantasy",
+      "description": "A dark secret hidden beneath Hogwarts begins to stir, turning students to stone and reviving old prejudices.",
+      "author_ids": [6]
+    },
+    {
+      "title": "Harry Potter and the Prisoner of Azkaban",
+      "year": 1999,
+      "book_isbn": "9780747546290",
+      "genre_name": "Fantasy",
+      "description": "A notorious fugitive escapes from wizard prison, and Harry learns unsettling truths about his parents.",
+      "author_ids": [6]
+    },
+    {
+      "title": "War and Peace",
+      "year": 1869,
+      "book_isbn": "9780199232765",
+      "genre_name": "Historical Fiction",
+      "description": "Russian aristocrats experience love, loss, and transformation during the Napoleonic Wars.",
+      "author_ids": [7]
+    },
+    {
+      "title": "Anna Karenina",
+      "year": 1877,
+      "book_isbn": "9780140449174",
+      "genre_name": "Literary Fiction",
+      "description": "A married woman’s passionate affair collides with rigid society, duty, and tragedy.",
+      "author_ids": [7]
+    },
+    {
+      "title": "Adventures of Huckleberry Finn",
+      "year": 1884,
+      "book_isbn": "9780142437179",
+      "genre_name": "Adventure",
+      "description": "A boy and an escaped slave raft down the Mississippi, encountering hypocrisy and violence along the way.",
+      "author_ids": [8]
+    },
+    {
+      "title": "The Adventures of Tom Sawyer",
+      "year": 1876,
+      "book_isbn": "9780143039563",
+      "genre_name": "Adventure",
+      "description": "A mischievous boy on the Mississippi River stumbles into trouble, treasure, and friendship.",
+      "author_ids": [8]
+    },
+    {
+      "title": "Frankenstein",
+      "year": 1818,
+      "book_isbn": "9780143131847",
+      "genre_name": "Gothic Horror",
+      "description": "A young scientist animates a being stitched from corpses and cannot bear the consequences of his creation.",
+      "author_ids": [9]
+    },
+    {
+      "title": "The Brothers Karamazov",
+      "year": 1880,
+      "book_isbn": "9780374528379",
+      "genre_name": "Philosophical Fiction",
+      "description": "Three very different brothers become entangled in a parricide case that raises questions about faith, guilt, and freedom.",
+      "author_ids": [10]
+    },
+    {
+      "title": "Crime and Punishment",
+      "year": 1866,
+      "book_isbn": "9780140449136",
+      "genre_name": "Psychological Fiction",
+      "description": "A poor student commits murder and is slowly crushed by conscience, paranoia, and a relentless detective.",
+      "author_ids": [10]
+    },
+    {
+      "title": "One Hundred Years of Solitude",
+      "year": 1967,
+      "book_isbn": "9780060883287",
+      "genre_name": "Magic Realism",
+      "description": "The rise and fall of the Buendia family in the town of Macondo plays out across generations, blurring myth and reality.",
+      "author_ids": [11]
+    },
+    {
+      "title": "Love in the Time of Cholera",
+      "year": 1985,
+      "book_isbn": "9780307389732",
+      "genre_name": "Romance",
+      "description": "A man waits decades to pursue the woman he loves after her long marriage to another.",
+      "author_ids": [11]
+    },
+    {
+      "title": "The Metamorphosis",
+      "year": 1915,
+      "book_isbn": "9780553213690",
+      "genre_name": "Absurdist",
+      "description": "A traveling salesman wakes up transformed into a monstrous insect and watches his family’s patience erode.",
+      "author_ids": [12]
+    },
+    {
+      "title": "The Trial",
+      "year": 1925,
+      "book_isbn": "9780805209990",
+      "genre_name": "Absurdist",
+      "description": "A man is arrested and prosecuted by a faceless court for a crime that is never explained.",
+      "author_ids": [12]
+    },
+    {
+      "title": "The Old Man and the Sea",
+      "year": 1952,
+      "book_isbn": "9780684801223",
+      "genre_name": "Literary Fiction",
+      "description": "An aging fisherman battles a giant marlin far out at sea, testing his endurance and pride.",
+      "author_ids": [13]
+    },
+    {
+      "title": "A Farewell to Arms",
+      "year": 1929,
+      "book_isbn": "9780684801469",
+      "genre_name": "War Fiction",
+      "description": "An American ambulance driver in World War I falls in love with a nurse as the war grinds on.",
+      "author_ids": [13]
+    },
+    {
+      "title": "Mrs Dalloway",
+      "year": 1925,
+      "book_isbn": "9780156628709",
+      "genre_name": "Modernist",
+      "description": "Over the course of a single day in London, a society hostess prepares for a party while memories and other lives intersect.",
+      "author_ids": [14]
+    },
+    {
+      "title": "To the Lighthouse",
+      "year": 1927,
+      "book_isbn": "9780156907392",
+      "genre_name": "Modernist",
+      "description": "A family’s visits to a summer house are fractured by time, war, and shifting relationships.",
+      "author_ids": [14]
+    },
+    {
+      "title": "Murder on the Orient Express",
+      "year": 1934,
+      "book_isbn": "9780062693662",
+      "genre_name": "Mystery",
+      "description": "Detective Poirot investigates a murder on a luxurious train where every passenger could be a suspect.",
+      "author_ids": [15]
+    },
+    {
+      "title": "And Then There Were None",
+      "year": 1939,
+      "book_isbn": "9780062073488",
+      "genre_name": "Mystery",
+      "description": "Ten strangers are lured to an isolated island and accused of past crimes as they die one by one.",
+      "author_ids": [15]
+    },
+    {
+      "title": "The Lion, the Witch and the Wardrobe",
+      "year": 1950,
+      "book_isbn": "9780064471046",
+      "genre_name": "Fantasy",
+      "description": "Four siblings find a magical land inside a wardrobe and join a lion in a battle against an endless winter.",
+      "author_ids": [16]
+    },
+    {
+      "title": "Prince Caspian",
+      "year": 1951,
+      "book_isbn": "9780064471053",
+      "genre_name": "Fantasy",
+      "description": "The children return to Narnia to help a young prince reclaim his stolen throne.",
+      "author_ids": [16]
+    },
+    {
+      "title": "The Hound of the Baskervilles",
+      "year": 1902,
+      "book_isbn": "9780141034324",
+      "genre_name": "Detective",
+      "description": "Sherlock Holmes investigates a legendary demonic hound haunting an isolated family estate.",
+      "author_ids": [17]
+    },
+    {
+      "title": "A Study in Scarlet",
+      "year": 1887,
+      "book_isbn": "9780486243053",
+      "genre_name": "Detective",
+      "description": "Dr. Watson meets Sherlock Holmes and is pulled into a murder case that stretches back to the American West.",
+      "author_ids": [17]
+    },
+    {
+      "title": "Foundation",
+      "year": 1951,
+      "book_isbn": "9780553293357",
+      "genre_name": "Science Fiction",
+      "description": "A mathematician predicts the fall of a galactic empire and creates a plan to shorten the coming dark age.",
+      "author_ids": [18]
+    },
+    {
+      "title": "I, Robot",
+      "year": 1950,
+      "book_isbn": "9780553382563",
+      "genre_name": "Science Fiction",
+      "description": "A series of stories explores robots, ethics, and the unintended effects of the Three Laws of Robotics.",
+      "author_ids": [18]
+    },
+    {
+      "title": "Do Androids Dream of Electric Sheep?",
+      "year": 1968,
+      "book_isbn": "9780345404473",
+      "genre_name": "Science Fiction",
+      "description": "A bounty hunter hunts rogue androids in a ruined Earth while struggling with empathy and identity.",
+      "author_ids": [19]
+    },
+    {
+      "title": "The Man in the High Castle",
+      "year": 1962,
+      "book_isbn": "9780547572482",
+      "genre_name": "Alternate History",
+      "description": "In a world where the Axis powers won World War II, several lives intersect around a mysterious banned book.",
+      "author_ids": [19]
+    },
+    {
+      "title": "A Wizard of Earthsea",
+      "year": 1968,
+      "book_isbn": "9780547773742",
+      "genre_name": "Fantasy",
+      "description": "A gifted boy at a school for wizards unleashes a shadow he must later chase across the world.",
+      "author_ids": [20]
+    },
+    {
+      "title": "The Left Hand of Darkness",
+      "year": 1969,
+      "book_isbn": "9780441478125",
+      "genre_name": "Science Fiction",
+      "description": "An envoy visits a planet where people have no fixed gender and struggles to navigate politics and trust.",
+      "author_ids": [20]
+    },
+    {
+      "title": "American Gods",
+      "year": 2001,
+      "book_isbn": "9780062572233",
+      "genre_name": "Fantasy",
+      "description": "A man released from prison is drawn into a war between old gods brought by immigrants and new gods of modern life.",
+      "author_ids": [21]
+    },
+    {
+      "title": "Coraline",
+      "year": 2002,
+      "book_isbn": "9780380807345",
+      "genre_name": "Dark Fantasy",
+      "description": "A girl discovers an alternate version of her home with frighteningly perfect other parents.",
+      "author_ids": [21]
+    },
+    {
+      "title": "The Handmaid's Tale",
+      "year": 1985,
+      "book_isbn": "9780385490818",
+      "genre_name": "Dystopian",
+      "description": "In a theocratic future, a woman forced to bear children for the elite fights to hold onto her memories and name.",
+      "author_ids": [22]
+    },
+    {
+      "title": "Oryx and Crake",
+      "year": 2003,
+      "book_isbn": "9780385503853",
+      "genre_name": "Dystopian",
+      "description": "The last man in a ruined world remembers his brilliant friend and the biotech experiments that destroyed civilization.",
+      "author_ids": [22]
+    },
+    {
+      "title": "Never Let Me Go",
+      "year": 2005,
+      "book_isbn": "9781400078776",
+      "genre_name": "Science Fiction",
+      "description": "Students at an English boarding school slowly realize their true purpose in a quietly chilling future.",
+      "author_ids": [23]
+    },
+    {
+      "title": "The Remains of the Day",
+      "year": 1989,
+      "book_isbn": "9780679731726",
+      "genre_name": "Literary Fiction",
+      "description": "An aging butler looks back on a life of duty and missed chances while driving across the English countryside.",
+      "author_ids": [23]
+    },
+    {
+      "title": "Mistborn: The Final Empire",
+      "year": 2006,
+      "book_isbn": "9780765311788",
+      "genre_name": "Epic Fantasy",
+      "description": "A street thief who can burn metals like magic joins a crew plotting to overthrow an immortal tyrant.",
+      "author_ids": [24]
+    },
+    {
+      "title": "The Well of Ascension",
+      "year": 2007,
+      "book_isbn": "9780765316882",
+      "genre_name": "Epic Fantasy",
+      "description": "After toppling an empire, the crew struggles to hold a fragile new kingdom together as new threats arise.",
+      "author_ids": [24]
+    },
+    {
+      "title": "The Way of Kings",
+      "year": 2010,
+      "book_isbn": "9780765326355",
+      "genre_name": "Epic Fantasy",
+      "description": "On a storm-lashed world, a disgraced warrior, a troubled scholar, and a conflicted prince move toward a common destiny.",
+      "author_ids": [24]
+    },
+    {
+      "title": "The Fifth Season",
+      "year": 2015,
+      "book_isbn": "9780316229296",
+      "genre_name": "Science Fantasy",
+      "description": "On a continent wracked by apocalyptic quakes, a woman with forbidden powers searches for her kidnapped daughter.",
+      "author_ids": [25]
+    },
+    {
+      "title": "The Obelisk Gate",
+      "year": 2016,
+      "book_isbn": "9780316229265",
+      "genre_name": "Science Fantasy",
+      "description": "As the world’s final season deepens, orogenes and stone eaters maneuver around a plan to remake the planet.",
+      "author_ids": [25]
+    },
+    {
+      "title": "The Stone Sky",
+      "year": 2017,
+      "book_isbn": "9780316229241",
+      "genre_name": "Science Fantasy",
+      "description": "A mother and daughter race toward a broken moon, each with a different vision for how the world should end or begin.",
+      "author_ids": [25]
+    }
+  ]
+}

@@ -45,3 +45,7 @@ class BookListRead(BaseModel):
 
 class BookDetailRead(BookListRead):
     reviews: List[ReviewBase] = Field(default_factory=list)
+
+class PaginatedBooks(BaseModel):
+    items: List[BookListRead]
+    next_cursor: str | None = None
