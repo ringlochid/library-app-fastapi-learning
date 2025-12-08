@@ -8,11 +8,13 @@ from dependencies import parse_sort
 from schemas.book import BookCreate, BookDetailRead, BookListRead, BookUpdate, BookSortControl, SortField, SortDirection, PaginatedBooks
 from schemas.review import ReviewCreate, ReviewRead
 from helpers import encode_cursor, decode_cursor
+from redis import Redis
+from cache import get_redis, cache_book, get_book, cache_list_with_params, get_list_with_params
 
 router = APIRouter(prefix='/books', tags=['books'])
 
 @router.get('/', response_model=PaginatedBooks)
-def get_books(
+def get_books_router(
     q: str | None = Query(None, description="Full-text query"),
     title: str | None = Query(None, description="Exact title filter"),
     isbn: str | None = Query(None, description="Exact ISBN filter"),
@@ -143,18 +145,25 @@ def get_books(
         next_cursor=next_cursor,
     )
 
-@router.get('/{book_id}', response_model=BookDetailRead)
-def get_book(book_id: int, db : Session = Depends(get_db)):
-    stat = (
+@router.get("/{book_id}", response_model=BookDetailRead)
+def get_book_router(book_id: int, db: Session = Depends(get_db), r: Redis = Depends(get_redis)):
+    cached = get_book(book_id, r=r)
+    if cached is not None:
+        return cached
+
+    stmt = (
         select(Book)
         .options(selectinload(Book.authors))
         .options(selectinload(Book.reviews))
         .where(Book.id == book_id)
     )
-    book = db.execute(stat).scalar_one_or_none()
+    book = db.execute(stmt).scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    return  book
+
+    payload = BookDetailRead.model_validate(book, from_attributes=True).model_dump()
+    cache_book(book_id, payload, r=r)
+    return payload
 
 @router.get('/{book_id}/reviews', response_model=List[ReviewRead])
 def get_reviews(book_id: int, db : Session = Depends(get_db)):

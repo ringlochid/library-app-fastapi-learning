@@ -5,13 +5,7 @@ from typing import Any, Iterable
 from redis import Redis, from_url
 
 _redis: Redis | None = None
-DEFAULT_TTL = 600
-
-def _client() -> Redis | None:
-    try:
-        return get_redis()
-    except Exception:
-        return None
+DEFAULT_TTL = 300
 
 def get_redis() -> Redis:
     global _redis
@@ -55,82 +49,62 @@ def make_author_books_key(author_id: int) -> str:
 def make_reviews_key(book_id: int) -> str:
     return f"book:{book_id}:reviews"
 
-def cache_book(book_id: int, book_data: dict, ttl: int = DEFAULT_TTL):
-    r = _client()
-    if not r:
-        return
+def cache_book(book_id: int, book_data: dict, r: Redis | None = None, ttl: int = DEFAULT_TTL):
+    r = r or get_redis()
     r.set(make_book_key(book_id), json.dumps(book_data), ex=ttl)
 
-def get_book(book_id: int) -> dict | None:
-    r = _client()
-    if not r:
-        return None
+def get_book(book_id: int, r: Redis | None = None) -> dict | None:
+    r = r or get_redis()
     raw = r.get(make_book_key(book_id))
     return json.loads(raw) if raw else None
 
-def cache_author(author_id: int, author_data: dict, ttl: int = DEFAULT_TTL):
-    r = _client()
-    if not r:
-        return
+def cache_author(author_id: int, author_data: dict, r: Redis | None = None, ttl: int = DEFAULT_TTL):
+    r = r or get_redis()
     r.set(make_author_key(author_id), json.dumps(author_data), ex=ttl)
 
-def get_author(author_id: int) -> dict | None:
-    r = _client()
-    if not r:
-        return None
+def get_author(author_id: int, r: Redis | None = None) -> dict | None:
+    r = r or get_redis()
     raw = r.get(make_author_key(author_id))
     return json.loads(raw) if raw else None
 
-def cache_list(key: str, data: Any, ttl: int = DEFAULT_TTL):
-    r = _client()
-    if not r:
-        return
+def cache_list(key: str, data: Any, r: Redis | None = None, ttl: int = DEFAULT_TTL):
+    r = r or get_redis()
     r.set(key, json.dumps(data), ex=ttl)
 
-def get_list(key: str) -> Any | None:
-    r = _client()
-    if not r:
-        return None
+def get_list(key: str, r: Redis | None = None) -> Any | None:
+    r = r or get_redis()
     raw = r.get(key)
     return json.loads(raw) if raw else None
 
-def cache_list_with_params(key: str, data: Any, params_payload: str, ttl: int = DEFAULT_TTL):
+def cache_list_with_params(key: str, data: Any, params_payload: str, r: Redis | None = None, ttl: int = DEFAULT_TTL):
     """Store list data alongside normalized params to guard against collisions."""
-    cache_list(key, {"data": data, "_params": params_payload}, ttl=ttl)
+    cache_list(key, {"data": data, "_params": params_payload}, r=r, ttl=ttl)
 
 
-def get_list_with_params(key: str, expected_params_payload: str) -> Any | None:
+def get_list_with_params(key: str, expected_params_payload: str, r: Redis | None = None) -> Any | None:
     """Return cached list only if params match; otherwise treat as miss."""
-    cached = get_list(key)
+    cached = get_list(key, r=r)
     if isinstance(cached, dict) and cached.get("_params") == expected_params_payload:
         return cached.get("data")
     return None
 
-def link_book_to_authors(book_id: int, author_ids: Iterable[int]):
-    r = _client()
-    if not r:
-        return
+def link_book_to_authors(book_id: int, author_ids: Iterable[int], r: Redis | None = None):
+    r = r or get_redis()
     for aid in author_ids:
         r.sadd(make_author_books_key(aid), book_id)
 
-def get_books_for_author(author_id: int) -> set[int]:
-    r = _client()
-    if not r:
-        return set()
+def get_books_for_author(author_id: int, r: Redis | None = None) -> set[int]:
+    r = r or get_redis()
     return {int(bid) for bid in r.smembers(make_author_books_key(author_id))}
 
-def invalidate_book(book_id: int):
-    r = _client()
-    if not r:
-        return
+def invalidate_book(book_id: int, r: Redis | None = None):
+    r = r or get_redis()
     r.delete(make_book_key(book_id))
     r.delete(make_reviews_key(book_id))
     r.delete(f"book:{book_id}:authors")
 
-def invalidate_author(author_id: int):
-    r = _client()
-    if not r:
-        return
+def invalidate_author(author_id: int, r: Redis | None = None):
+    r = r or get_redis()
     r.delete(make_author_key(author_id))
     author_books_key = make_author_books_key(author_id)
     book_ids = r.smembers(author_books_key)
