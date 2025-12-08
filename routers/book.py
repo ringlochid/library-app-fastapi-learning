@@ -57,6 +57,8 @@ def get_books_router(
                 sort_field=SortField.by_similarity, sort_direction=SortDirection.desc
             )
         ]
+
+    sort_param = [s.model_dump() for s in sort]
     params = {
         "q": q,
         "title": title,
@@ -67,13 +69,14 @@ def get_books_router(
         "limit": limit,
         "offset": offset,
         "cursor": cursor,
-        "sort": sort,
+        "sort": sort_param,
     }
     key, payload = make_books_list_key(params)
     cache = get_list_with_params(key, payload, r)
     if cache is not None:
         return cache
     stmt = select(Book).options(selectinload(Book.authors))
+
     if title:
         stmt = stmt.where(Book.title == title)
     if isbn:
