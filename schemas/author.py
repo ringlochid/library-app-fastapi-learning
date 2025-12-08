@@ -16,7 +16,9 @@ class AuthorRead(BaseModel):
     id: int
     name: str
     email: str | None
-    books: List[BookBase] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
+
+class AuthorDetailedRead(AuthorRead):
+    books: List[BookBase] = Field(default_factory=list)

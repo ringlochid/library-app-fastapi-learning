@@ -24,7 +24,7 @@ def get_books(
     cursor: str | None = Query(None, description="Pagination cursor"),
     sort : List[BookSortControl] = Depends(parse_sort),
     db: Session = Depends(get_db),
-    ):
+):
     stmt = (
         select(Book)
         .options(selectinload(Book.authors))

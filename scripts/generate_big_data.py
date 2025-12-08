@@ -125,7 +125,7 @@ SEED_AUTHORS: list[str] = [
     "Charlaine Harris",
 ]
 
-TARGET_BOOKS = 1100  # stop once we have this many books
+TARGET_BOOKS = 11000  # stop once we have this many books
 OUTPUT_PATH = Path("data_feeding.txt")
 MAX_TITLE_LEN = 200
 
@@ -191,7 +191,8 @@ def main() -> None:
 
             isbn_list = doc.get("isbn") or []
             book_isbn = next((i for i in isbn_list if len(i) in (10, 13)), None)
-            year = doc.get("first_publish_year")
+            year_raw = doc.get("first_publish_year")
+            year = year_raw if isinstance(year_raw, int) and year_raw > 0 else None
 
             subjects = doc.get("subject") or []
             genre = subjects[0] if subjects else "General"

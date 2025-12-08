@@ -1,7 +1,7 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import select
+from sqlalchemy import or_, select, func
 from models import Author, Book
 from database import get_db
 from schemas.author import AuthorCreate, AuthorRead, AuthorUpdate
@@ -9,11 +9,45 @@ from schemas.author import AuthorCreate, AuthorRead, AuthorUpdate
 router = APIRouter(prefix="/authors", tags=["authors"])
 
 @router.get('/', response_model=List[AuthorRead])
-def get_authors(db : Session = Depends(get_db)):
+def get_authors(
+    q: str | None = Query(None, description="Full-text query"),
+    name: str | None = Query(None, description="Exact name filter"),
+    email: str | None = Query(None, description="Exact email filter"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int =  Query(0),
+    db : Session = Depends(get_db),
+):
     stat = (
         select(Author)
         .options(selectinload(Author.books))
     )
+
+    if name:
+        stat = stat.where(Author.name == name)
+    if email:
+        stat = stat.where(Author.email == email)
+    
+    order_exp = []
+
+    if q:
+        norm_q = func.immutable_unaccent(q)
+        name_sim = func.similarity(func.immutable_unaccent(Author.name), norm_q)
+        email_sim = func.similarity(func.coalesce(func.immutable_unaccent(Author.email), ""), norm_q)
+        total_score = 0.7 * name_sim + 0.3 * email_sim
+        stat = (
+            stat.where(
+                or_(
+                    func.immutable_unaccent(Author.name).op("%")(norm_q),
+                    func.immutable_unaccent(Author.email).op("%")(norm_q)
+                )
+            )
+            .add_columns(total_score.label("total_score"))
+        )
+        order_exp.append(total_score.desc())
+    
+    order_exp.append(Author.id.asc())
+    stat = stat.order_by(*order_exp)
+    stat = stat.limit(limit).offset(offset)
     authors = db.execute(stat).scalars().all()
     return authors
 

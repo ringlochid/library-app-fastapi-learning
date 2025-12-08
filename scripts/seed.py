@@ -16,9 +16,12 @@ for idx, author in enumerate(data["authors"], start=1):
     idx_to_id[idx] = r.json()["id"]
 
 for book in data["books"]:
+    year = book["year"]
+    if isinstance(year, int) and year <= 0:
+        year = None
     payload = {
         "title": book["title"],
-        "year": book["year"],
+        "year": year,
         "book_isbn": book["book_isbn"],
         "genre_name": book["genre_name"],
         "description": book["description"],
