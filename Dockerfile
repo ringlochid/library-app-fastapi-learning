@@ -12,6 +12,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    git \
+    curl \
+    nano \
+    less \
+    iputils-ping \
+    postgresql-client \
+    redis-tools \
  && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps

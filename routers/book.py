@@ -1,37 +1,79 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_, asc, desc, func, or_, select, text
+from sqlalchemy import and_, asc, desc, func, or_, select
 from models import Author, Book, Review
 from database import get_db
 from dependencies import parse_sort
-from schemas.book import BookCreate, BookDetailRead, BookListRead, BookUpdate, BookSortControl, SortField, SortDirection, PaginatedBooks
+from schemas.book import (
+    BookCreate,
+    BookDetailRead,
+    BookListRead,
+    BookUpdate,
+    BookSortControl,
+    SortField,
+    SortDirection,
+    PaginatedBooks,
+)
 from schemas.review import ReviewCreate, ReviewRead
 from helpers import encode_cursor, decode_cursor
 from redis import Redis
-from cache import get_redis, cache_book, get_book, cache_list_with_params, get_list_with_params
+from cache import (
+    cache_list,
+    get_list,
+    get_redis,
+    cache_book,
+    get_book,
+    cache_list_with_params,
+    get_list_with_params,
+    invalidate_author,
+    invalidate_book,
+    make_books_list_key,
+    make_reviews_key,
+    bump_cache_version,
+)
 
-router = APIRouter(prefix='/books', tags=['books'])
+router = APIRouter(prefix="/books", tags=["books"])
 
-@router.get('/', response_model=PaginatedBooks)
+
+@router.get("/", response_model=PaginatedBooks)
 def get_books_router(
     q: str | None = Query(None, description="Full-text query"),
     title: str | None = Query(None, description="Exact title filter"),
     isbn: str | None = Query(None, description="Exact ISBN filter"),
     author_id: int | None = Query(None, description="Filter by author id"),
-    before : int | None = Query(None, description="Filter by Year(before)"),
-    after : int | None = Query(None, description="Filter by Year(after)"),
+    before: int | None = Query(None, description="Filter by Year(before)"),
+    after: int | None = Query(None, description="Filter by Year(after)"),
     limit: int = Query(20, ge=1, le=100, description="Pagination limit"),
-    offset: int | None =  Query(None, description="Work when no cursor"),
+    offset: int | None = Query(None, description="Work when no cursor"),
     cursor: str | None = Query(None, description="Pagination cursor"),
-    sort : List[BookSortControl] = Depends(parse_sort),
+    sort: List[BookSortControl] = Depends(parse_sort),
     db: Session = Depends(get_db),
+    r: Redis = Depends(get_redis),
 ):
-    stmt = (
-        select(Book)
-        .options(selectinload(Book.authors))
-    )
-
+    if q and not sort:
+        sort = [
+            BookSortControl(
+                sort_field=SortField.by_similarity, sort_direction=SortDirection.desc
+            )
+        ]
+    params = {
+        "q": q,
+        "title": title,
+        "isbn": isbn,
+        "author_id": author_id,
+        "before": before,
+        "after": after,
+        "limit": limit,
+        "offset": offset,
+        "cursor": cursor,
+        "sort": sort,
+    }
+    key, payload = make_books_list_key(params)
+    cache = get_list_with_params(key, payload, r)
+    if cache is not None:
+        return cache
+    stmt = select(Book).options(selectinload(Book.authors))
     if title:
         stmt = stmt.where(Book.title == title)
     if isbn:
@@ -42,7 +84,7 @@ def get_books_router(
         stmt = stmt.where(Book.year <= before)
     if after:
         stmt = stmt.where(Book.year >= after)
-    
+
     if q:
         tsq = func.websearch_to_tsquery("english", q)
         fts_score = func.ts_rank(Book.search_tsv, tsq)
@@ -50,9 +92,14 @@ def get_books_router(
         author_sim = func.coalesce(func.max(func.similarity(Author.name, q)), 0.0)
         total = 0.6 * fts_score + 0.25 * title_sim + 0.15 * author_sim
         stmt = (
-            stmt
-            .join(Book.authors, isouter=True)
-            .where(or_(Book.search_tsv.op("@@")(tsq), Book.title.op("%")(q), Author.name.op("%")(q)))
+            stmt.join(Book.authors, isouter=True)
+            .where(
+                or_(
+                    Book.search_tsv.op("@@")(tsq),
+                    Book.title.op("%")(q),
+                    Author.name.op("%")(q),
+                )
+            )
             .group_by(Book.id)
             .add_columns(
                 fts_score.label("fts_score"),
@@ -61,7 +108,7 @@ def get_books_router(
                 total.label("total_score"),
             )
         )
-    
+
     order_exprs: list = []
 
     for s in sort:
@@ -83,8 +130,8 @@ def get_books_router(
             asc(col) if s.sort_direction is SortDirection.asc else desc(col)
         )
 
-    if q and not order_exprs:
-        order_exprs.append(desc(total))
+    # if q and not order_exprs:
+    #     order_exprs.append(desc(total))
 
     order_exprs.append(Book.id.asc())
     stmt = stmt.order_by(*order_exprs)
@@ -108,7 +155,7 @@ def get_books_router(
         stmt = stmt.having(
             or_(
                 total < last_score,
-                and_(total == last_score, Book.id > last_id),#handle edge cases
+                and_(total == last_score, Book.id > last_id),  # handle edge cases
             )
         )
     elif cursor and not by_similarity:
@@ -121,7 +168,7 @@ def get_books_router(
     if offset is not None and cursor is None:
         stmt = stmt.offset(offset)
 
-    #check if there's a next page
+    # check if there's a next page
     stmt = stmt.limit(limit + 1)
     rows = db.execute(stmt).unique().all()
 
@@ -134,20 +181,24 @@ def get_books_router(
     if has_next and by_similarity:
         last_row = items_rows[-1]
         last_book: Book = last_row[0]
-        last_total_score = last_row[-1]   # total_score is last selected column
+        last_total_score = last_row[-1]  # total_score is last selected column
 
         next_cursor = encode_cursor(
             {"id": last_book.id, "score": float(last_total_score)}
         )
-
-    return PaginatedBooks(
-        items=books,   # type: ignore
+    serialized = PaginatedBooks(
+        items=books,  # type: ignore
         next_cursor=next_cursor,
-    )
+    ).model_dump()
+    cache_list_with_params(key, serialized, payload, r)
+    return serialized
+
 
 @router.get("/{book_id}", response_model=BookDetailRead)
-def get_book_router(book_id: int, db: Session = Depends(get_db), r: Redis = Depends(get_redis)):
-    cached = get_book(book_id, r=r)
+def get_book_router(
+    book_id: int, db: Session = Depends(get_db), r: Redis = Depends(get_redis)
+):
+    cached = get_book(book_id, r)
     if cached is not None:
         return cached
 
@@ -165,20 +216,32 @@ def get_book_router(book_id: int, db: Session = Depends(get_db), r: Redis = Depe
     cache_book(book_id, payload, r=r)
     return payload
 
-@router.get('/{book_id}/reviews', response_model=List[ReviewRead])
-def get_reviews(book_id: int, db : Session = Depends(get_db)):
-    stat = (
-        select(Book)
-        .options(selectinload(Book.reviews))
-        .where(Book.id == book_id)
-    )
+
+@router.get("/{book_id}/reviews", response_model=List[ReviewRead])
+def get_reviews(
+    book_id: int, db: Session = Depends(get_db), r: Redis = Depends(get_redis)
+):
+    key = make_reviews_key(book_id)
+    cached = get_list(key, r)
+    if cached is not None:
+        return cached
+    stat = select(Book).options(selectinload(Book.reviews)).where(Book.id == book_id)
     book = db.execute(stat).scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    return book.reviews
+    payload = [
+        ReviewRead(review, from_attributes=True).model_dump() for review in book.reviews
+    ]
+    cache_list(key, payload, r)
+    return payload
 
-@router.post('/', response_model=BookDetailRead)
-def create_book(book : BookCreate, db : Session = Depends(get_db)):
+
+@router.post("/", response_model=BookDetailRead)
+def create_book(
+    book: BookCreate,
+    db: Session = Depends(get_db),
+    r: Redis | None = Depends(get_redis),
+):
     new_book = Book(
         title=book.title,
         year=book.year,
@@ -193,7 +256,9 @@ def create_book(book : BookCreate, db : Session = Depends(get_db)):
         authors = db.execute(stmt_authors).scalars().all()
 
         if len(authors) != len(author_ids):
-            raise HTTPException(status_code=400, detail="At least one author id does not exist.")
+            raise HTTPException(
+                status_code=400, detail="At least one author id does not exist."
+            )
 
         new_book.authors = list(authors)
     else:
@@ -202,10 +267,19 @@ def create_book(book : BookCreate, db : Session = Depends(get_db)):
     db.add(new_book)
     db.commit()
     db.refresh(new_book)
+    bump_cache_version("books:list", r)
+    for author in new_book.authors:
+        invalidate_author(author.id, r, book_ids=[new_book.id])
     return new_book
 
-@router.post('/{book_id}/reviews', response_model=ReviewRead)
-def create_review(book_id : int, review : ReviewCreate, db : Session = Depends(get_db)):
+
+@router.post("/{book_id}/reviews", response_model=ReviewRead)
+def create_review(
+    book_id: int,
+    review: ReviewCreate,
+    db: Session = Depends(get_db),
+    r: Redis | None = Depends(get_redis),
+):
     stat_book = (
         select(Book)
         .options(selectinload(Book.authors))
@@ -215,25 +289,36 @@ def create_review(book_id : int, review : ReviewCreate, db : Session = Depends(g
     book = db.execute(stat_book).scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    dup_check = (
-        select(Review)
-        .where(Review.book_id == book_id, Review.reviewer_name == review.reviewer_name)
+    dup_check = select(Review).where(
+        Review.book_id == book_id, Review.reviewer_name == review.reviewer_name
     )
     if db.execute(dup_check).scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Reviewer has already reviewed this book.")
+        raise HTTPException(
+            status_code=400, detail="Reviewer has already reviewed this book."
+        )
     new_review = Review(
         book_id=book_id,
         reviewer_name=review.reviewer_name,
         rating=review.rating,
         comment=review.comment,
     )
+    author_ids = [author.id for author in book.authors]
     db.add(new_review)
     db.commit()
     db.refresh(new_review)
+    for aid in author_ids:
+        invalidate_author(aid, r, book_ids=[book_id])
+    invalidate_book(book_id, r)
     return new_review
 
-@router.put('/{book_id}', response_model=BookDetailRead)
-def replace_book(book_id: int , new_book : BookCreate, db : Session = Depends(get_db)):
+
+@router.put("/{book_id}", response_model=BookDetailRead)
+def replace_book(
+    book_id: int,
+    new_book: BookCreate,
+    db: Session = Depends(get_db),
+    r: Redis = Depends(get_redis),
+):
     stat = (
         select(Book)
         .options(selectinload(Book.authors))
@@ -242,7 +327,9 @@ def replace_book(book_id: int , new_book : BookCreate, db : Session = Depends(ge
     )
     old_book = db.execute(stat).scalar_one_or_none()
     if not old_book:
-        raise HTTPException(status_code=404, detail='Book not found')
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    previous_author_ids = {a.id for a in old_book.authors}
 
     if new_book.author_ids:
         author_ids = set(new_book.author_ids)
@@ -250,34 +337,51 @@ def replace_book(book_id: int , new_book : BookCreate, db : Session = Depends(ge
         authors = db.execute(stmt_authors).scalars().all()
 
         if len(authors) != len(author_ids):
-            raise HTTPException(status_code=400, detail="At least one author id does not exist.")
+            raise HTTPException(
+                status_code=400, detail="At least one author id does not exist."
+            )
 
         old_book.authors = list(authors)
+        updated_author_ids = author_ids
     else:
         old_book.authors = []
-    
+        updated_author_ids = set()
+
     old_book.title = new_book.title
     old_book.year = new_book.year
     old_book.book_isbn = new_book.book_isbn
     old_book.genre_name = new_book.genre_name
     old_book.description = new_book.description
     # old_book.reviews = []
+    affected_author_ids = previous_author_ids | updated_author_ids
     db.commit()
     db.refresh(old_book)
+    for aid in affected_author_ids:
+        invalidate_author(aid, r, book_ids=[book_id])
+    invalidate_book(book_id, r)
+    bump_cache_version("books:list", r)
     return old_book
 
-@router.put('/{book_id}/authors', response_model=BookDetailRead)
-def update_author_list(book_id : int, new_author_list : list[int], db : Session = Depends(get_db)):
+
+@router.put("/{book_id}/authors", response_model=BookDetailRead)
+def update_author_list(
+    book_id: int,
+    new_author_list: list[int],
+    db: Session = Depends(get_db),
+    r: Redis | None = Depends(get_redis),
+):
     stat_book = (
         select(Book)
         .options(selectinload(Book.authors))
         .options(selectinload(Book.reviews))
         .where(Book.id == book_id)
-        )
+    )
     book = db.execute(stat_book).scalar_one_or_none()
     if not book:
-        raise HTTPException(status_code=404, detail='Cant find the book')
+        raise HTTPException(status_code=404, detail="Cant find the book")
+    previous_author_ids = {a.id for a in book.authors}
     if not new_author_list:
+        author_ids: set[int] = set()
         book.authors = []
     else:
         author_ids = set(new_author_list)
@@ -285,15 +389,28 @@ def update_author_list(book_id : int, new_author_list : list[int], db : Session 
         authors = db.execute(stmt_authors).scalars().all()
 
         if len(author_ids) != len(authors):
-            raise HTTPException(status_code=400, detail="At least one author id does not exist.")
-        
+            raise HTTPException(
+                status_code=400, detail="At least one author id does not exist."
+            )
+
         book.authors = list(authors)
+    affected_author_ids = previous_author_ids | author_ids
     db.commit()
     db.refresh(book)
+    for aid in affected_author_ids:
+        invalidate_author(aid, r, book_ids=[book_id])
+    invalidate_book(book_id, r)
+    bump_cache_version("books:list", r)
     return book
 
-@router.patch('/{book_id}', response_model=BookDetailRead)
-def update_book(book_id: int , new_book : BookUpdate, db : Session = Depends(get_db)):
+
+@router.patch("/{book_id}", response_model=BookDetailRead)
+def update_book(
+    book_id: int,
+    new_book: BookUpdate,
+    db: Session = Depends(get_db),
+    r: Redis | None = Depends(get_redis),
+):
     stat = (
         select(Book)
         .options(selectinload(Book.authors))
@@ -303,7 +420,7 @@ def update_book(book_id: int , new_book : BookUpdate, db : Session = Depends(get
     old_book = db.execute(stat).scalar_one_or_none()
 
     if not old_book:
-        raise HTTPException(status_code=404, detail='Book not found')
+        raise HTTPException(status_code=404, detail="Book not found")
 
     update_data = new_book.model_dump(exclude_unset=True)
     for key, val in update_data.items():
@@ -311,4 +428,28 @@ def update_book(book_id: int , new_book : BookUpdate, db : Session = Depends(get
 
     db.commit()
     db.refresh(old_book)
+    invalidate_book(book_id, r)
+    bump_cache_version("books:list", r)
     return old_book
+
+
+@router.delete("/{book_id}", status_code=204)
+def delete_book(
+    book_id: int,
+    db: Session = Depends(get_db),
+    r: Redis | None = Depends(get_redis),
+):
+    stat = select(Book).where(Book.id == book_id)
+
+    old_book = db.execute(stat).scalar_one_or_none()
+
+    if not old_book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    author_ids = [author.id for author in old_book.authors]
+    db.delete(old_book)
+    db.commit()
+    for aid in author_ids:
+        invalidate_author(aid, r, book_ids=[book_id])
+    invalidate_book(book_id, r)
+    bump_cache_version("books:list", r)
