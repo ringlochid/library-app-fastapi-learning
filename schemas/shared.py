@@ -9,8 +9,9 @@ class AuthorBase(BaseModel):
         from_attributes = True
 
 class ReviewBase(BaseModel):
+    id: int
     rating: int
-    reviewer_name : str
+    reviewer_name: str
     comment: str | None = None
 
     class Config:

@@ -1,11 +1,25 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from cache import close_redis, init_redis
 from routers import author, book, review
 
-#from database import Base, engine
-#Base.metadata.create_all(bind=engine) #for prototyping
+# from database import Base, engine
+# Base.metadata.create_all(bind=engine) #for prototyping
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.redis = await init_redis()
+    try:
+        yield
+    finally:
+        await close_redis()
+
+
+app = FastAPI(lifespan=lifespan)
 
 origins = [
     "http://127.0.0.1:5500",

@@ -2,10 +2,10 @@ from fastapi import Query, HTTPException, status
 from typing import List
 from schemas.book import BookSortControl, SortField, SortDirection
 
+
 def parse_sort(
     sort: List[str] = Query(
-        default=[],
-        description="Sort spec like 'similarity:desc', 'title:asc'"
+        default=[], description="Sort spec like 'similarity:desc', 'title:asc'"
     )
 ) -> List[BookSortControl]:
     result: List[BookSortControl] = []
@@ -16,7 +16,7 @@ def parse_sort(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid sort item '{item}', expected 'field:direction'"
+                detail=f"Invalid sort item '{item}', expected 'field:direction'",
             )
 
         try:
@@ -24,7 +24,7 @@ def parse_sort(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid sort field '{field_str}'"
+                detail=f"Invalid sort field '{field_str}'",
             )
 
         try:
@@ -32,7 +32,7 @@ def parse_sort(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid sort direction '{dir_str}'"
+                detail=f"Invalid sort direction '{dir_str}'",
             )
 
         result.append(BookSortControl(sort_field=field, sort_direction=direction))
