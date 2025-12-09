@@ -125,7 +125,9 @@ SEED_AUTHORS: list[str] = [
     "Charlaine Harris",
 ]
 
-TARGET_BOOKS = 11000  # stop once we have this many books
+TARGET_BOOKS = 50_000  # stop once we have this many books
+FETCH_FROM_OPEN_LIBRARY = True  # set to True to pull a small sample from Open Library
+FETCH_PER_AUTHOR_LIMIT = 20
 OUTPUT_PATH = Path("data_feeding.txt")
 MAX_TITLE_LEN = 200
 
@@ -141,7 +143,9 @@ def slug_email(name: str) -> str:
     return f"{slug}@example.com"
 
 
-def fetch_docs(author: str, per_author_limit: int = 40) -> Iterable[dict]:
+def fetch_docs(
+    author: str, per_author_limit: int = FETCH_PER_AUTHOR_LIMIT
+) -> Iterable[dict]:
     """Fetch book docs for one author from Open Library."""
     try:
         resp = requests.get(
@@ -159,13 +163,14 @@ def fetch_docs(author: str, per_author_limit: int = 40) -> Iterable[dict]:
         print(f"Skipping {author}: {exc}")
         return []
 
+
 def clip_title(title: str) -> str:
     """Ensure title fits DB column length."""
     return title[:MAX_TITLE_LEN]
 
 
 def main() -> None:
-    authors = [
+    authors: list[dict] = [
         {"name": name, "email": slug_email(name), "book_ids": []}
         for name in SEED_AUTHORS
     ]
@@ -174,62 +179,63 @@ def main() -> None:
     books: list[dict] = []
     seen: set[tuple[str, tuple[int, ...]]] = set()
 
-    for name in SEED_AUTHORS:
-        docs = fetch_docs(name)
-        primary_author_id = author_lookup.get(name.lower())
+    if FETCH_FROM_OPEN_LIBRARY:
+        for name in SEED_AUTHORS:
+            docs = fetch_docs(name)
+            primary_author_id = author_lookup.get(name.lower())
 
-        for doc in docs:
-            if len(books) >= TARGET_BOOKS:
-                break
-            title_raw = doc.get("title")
-            if not title_raw:
-                continue
+            for doc in docs:
+                if len(books) >= TARGET_BOOKS:
+                    break
+                title_raw = doc.get("title")
+                if not title_raw:
+                    continue
 
-            title = clip_title(title_raw)
-            if not title:
-                continue
+                title = clip_title(title_raw)
+                if not title:
+                    continue
 
-            isbn_list = doc.get("isbn") or []
-            book_isbn = next((i for i in isbn_list if len(i) in (10, 13)), None)
-            year_raw = doc.get("first_publish_year")
-            year = year_raw if isinstance(year_raw, int) and year_raw > 0 else None
+                isbn_list = doc.get("isbn") or []
+                book_isbn = next((i for i in isbn_list if len(i) in (10, 13)), None)
+                year_raw = doc.get("first_publish_year")
+                year = year_raw if isinstance(year_raw, int) and year_raw > 0 else None
 
-            subjects = doc.get("subject") or []
-            genre = subjects[0] if subjects else "General"
-            description = (
-                "; ".join(subjects[:3])
-                if subjects
-                else f"A popular book by {name}."
-            )
+                subjects = doc.get("subject") or []
+                genre = subjects[0] if subjects else "General"
+                description = (
+                    "; ".join(subjects[:3])
+                    if subjects
+                    else f"A popular book by {name}."
+                )
 
-            author_names = [a for a in (doc.get("author_name") or []) if a]
-            author_ids = [
-                author_lookup[a.lower()]
-                for a in author_names
-                if a.lower() in author_lookup
-            ]
-            if not author_ids and primary_author_id:
-                author_ids = [primary_author_id]
-            if not author_ids:
-                continue
+                author_names = [a for a in (doc.get("author_name") or []) if a]
+                author_ids = [
+                    author_lookup[a.lower()]
+                    for a in author_names
+                    if a.lower() in author_lookup
+                ]
+                if not author_ids and primary_author_id:
+                    author_ids = [primary_author_id]
+                if not author_ids:
+                    continue
 
-            key = (title.lower(), tuple(sorted(author_ids)))
-            if key in seen:
-                continue
+                key = (title.lower(), tuple(sorted(author_ids)))
+                if key in seen:
+                    continue
 
-            seen.add(key)
-            books.append(
-                {
-                    "title": title,
-                    "year": year,
-                    "book_isbn": book_isbn,
-                    "genre_name": genre,
-                    "description": description,
-                    "author_ids": author_ids,
-                }
-            )
+                seen.add(key)
+                books.append(
+                    {
+                        "title": title,
+                        "year": year,
+                        "book_isbn": book_isbn,
+                        "genre_name": genre,
+                        "description": description,
+                        "author_ids": author_ids,
+                    }
+                )
 
-    # if we still need more, synthesize filler titles so we always have 1000+
+    # synthesize filler titles to hit the target quickly
     while len(books) < TARGET_BOOKS:
         idx = len(books) + 1
         author_id = (idx % len(authors)) + 1

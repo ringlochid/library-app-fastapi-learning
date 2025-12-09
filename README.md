@@ -1,47 +1,51 @@
-# Library App (FastAPI)
+# Library Service (FastAPI + Postgres + Redis)
 
-Small FastAPI project for managing authors, books, and reviews with PostgreSQL + SQLAlchemy.
+Production-oriented API for managing authors, books, and reviews. Uses FastAPI with SQLAlchemy (sync), PostgreSQL for storage, and Redis for caching list/detail reads with cache-version invalidation.
 
-## Quickstart
-- Python 3.11+ recommended. Install deps: `pip install fastapi uvicorn sqlalchemy psycopg[binary]`.
-- Configure database/redis URLs via env vars (`DATABASE_URL`, `REDIS_HOST`, etc.). A local `.env` is loaded automatically if present:
-  - Default DB URL fallback: `postgresql+psycopg://postgres:123456@localhost:5432/library_app`
-  - Ensure the user/password/database exist, or override with your own credentials.
-- Initialize tables: `python -c "import main"` (or let FastAPI import create them on first run).
-- Run the API: `uvicorn main:app --reload`.
-- Docs: open http://127.0.0.1:8000/docs.
+## Stack and Capabilities
+- FastAPI, Uvicorn, Pydantic v2.
+- SQLAlchemy 2.x (sync) with PostgreSQL; migrations via Alembic.
+- Redis caching (per-entity entries + versioned list caches).
+- Author/book/review CRUD, full-text-ish search with similarity filters, cursor/offset pagination for books.
 
-## Data Model
-- Author ⇄ Book: many-to-many (`author_book_relation`).
-- Book → Review: one-to-many (reviews cascade-delete with books).
-- Constraints: book.year must be > 0 if set; review.rating must be 1–5.
+## Running the API
+### Docker Compose (recommended)
+1) Set environment (either `.env` or export):
+```
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=123456
+POSTGRES_DB=library_app
+DB_HOST=db
+DB_PORT=5432
+REDIS_HOST=redis
+APP_PORT=8000
+```
+2) Build and start: `docker-compose up --build`
+3) Apply migrations (inside the app container): `alembic upgrade head`
+4) API available at `http://localhost:8000` (docs at `/docs`).
 
-## API
-Authors (`/authors`)
-- POST `/authors` — create (body: name, email?, book_ids?).
-- GET `/authors` — list authors (with their books).
-- GET `/authors/{author_id}` — get one (with books).
-- PUT `/authors/{author_id}` — replace name/email and linked books.
-- PATCH `/authors/{author_id}` — partial update (name/email, optional book_ids).
-- DELETE `/authors/{author_id}` — delete author (books remain, author removed from them).
+### Local (without containers)
+1) Install Python 3.11+ and dependencies: `pip install -r requirements.txt`
+2) Provide `DATABASE_URL` (e.g., `postgresql+psycopg://postgres:123456@localhost:5432/library_app`) and `REDIS_HOST`/`REDIS_PORT` via env or `.env`.
+3) Run migrations: `alembic upgrade head`
+4) Start the server: `uvicorn main:app --host 0.0.0.0 --port 8000 --reload`
 
-Books (`/books`)
-- POST `/books` — create (title, year?, author_ids?; validates authors exist).
-- GET `/books?author_id=` — list books, optionally filtered by author_id; returns nested authors and reviews.
-- GET `/books/{book_id}` — get one book with nested authors and reviews.
-- PUT `/books/{book_id}` — replace title/year and author list.
-- PATCH `/books/{book_id}` — partial update of title/year (authors untouched).
-- PUT `/books/{book_id}/authors` — replace the book’s authors with a new list of author_ids (validated).
+## Caching Notes
+- Keys: `author:{id}`, `book:{id}`, list keys with versioning (`authors:list`, `books:list`).
+- TTL defaults to 300s. Mutations bump list versions and invalidate related detail/review caches.
+- Redis URL is built from `REDIS_*` envs; override with `REDIS_URL` if needed.
 
-Reviews (`/books/{book_id}/reviews`, `/reviews`)
-- POST `/books/{book_id}/reviews` — add review to a book (reviewer_name, rating 1–5, comment?).
-- GET `/books/{book_id}/reviews` — list reviews for a book.
-- DELETE `/reviews/{review_id}` — delete a review.
+## Data and Seeding
+- Generate sample payload: `python scripts/generate_big_data.py` (default synthetic 50k books to `data_feeding.txt`; toggle `FETCH_FROM_OPEN_LIBRARY` for live samples).
+- Seed the running API from that file: `python scripts/seed.py` (assumes API at `http://localhost:8000`).
 
-## Schemas (selected)
-- `BookRead`: id, title, year, authors[], reviews[] (reviews only include rating, comment in nested view).
-- `ReviewCreate/Update`: rating validated to 1–5.
+## Development Tips
+- Migrations live in `migrations/`; use `alembic revision --autogenerate -m "msg"` then `alembic upgrade head`.
+- SQLAlchemy sessions are synchronous; plan for async migration by switching to `AsyncSession` and async drivers, and ensuring background workers (Celery/RQ/Arq) reuse Redis for cache invalidation if introduced.
+- Keep `pydantic` instantiation via `model_validate(..., from_attributes=True)` for ORM objects (already applied).
 
-## Notes
-- On Postgres connection errors, verify the credentials/DB in `database.py` or set `DATABASEURL` accordingly.
-- Relationships eager-load via `selectinload` to avoid N+1 issues in list/detail endpoints.
+## Roadmap / Next Steps
+- Move to async stack (async SQLAlchemy + async Redis client).
+- Introduce background worker for heavy tasks (e.g., bulk imports, cache warming).
+- Add auth/rate limiting and request logging/metrics for production.
+- Expand tests around caching invariants and search/pagination edge cases.

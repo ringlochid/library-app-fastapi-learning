@@ -233,7 +233,8 @@ def get_reviews(
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     payload = [
-        ReviewRead(review, from_attributes=True).model_dump() for review in book.reviews
+        ReviewRead.model_validate(review, from_attributes=True).model_dump()
+        for review in book.reviews
     ]
     cache_list(key, payload, r)
     return payload
