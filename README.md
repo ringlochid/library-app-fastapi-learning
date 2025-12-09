@@ -49,3 +49,29 @@ APP_PORT=8000
 - Introduce background worker for heavy tasks (e.g., bulk imports, cache warming).
 - Add auth/rate limiting and request logging/metrics for production.
 - Expand tests around caching invariants and search/pagination edge cases.
+
+## API Routes and How to Call Them
+Base URL defaults to `http://localhost:8000`. All payloads are JSON; send `Content-Type: application/json`.
+
+### Books
+- `GET /books` — List books with filters. Query: `q` (full-text + trigram search), `title`, `isbn`, `author_id`, `before`/`after` (year), `limit` (1–100, default 20), `offset` (works only when `cursor` is absent), `cursor` (keyset pagination only when primary sort is similarity), `sort` (repeatable; `title:asc`, `year:desc`, `similarity:desc`; `similarity` requires `q`). Response: `{"items": [...], "next_cursor": "..."|null}` with authors embedded on each item. Example: `curl 'http://localhost:8000/books?q=asimov&sort=similarity:desc&limit=5'`.
+- `GET /books/{book_id}` — Book detail (authors + reviews). 404 if missing.
+- `GET /books/{book_id}/reviews` — All reviews for a book.
+- `POST /books` — Create book. Body `{"title": "...", "year": 1999, "book_isbn": "...", "genre_name": "...", "description": "...", "author_ids": [1,2]}`. Author IDs must exist; returns created book with authors.
+- `POST /books/{book_id}/reviews` — Add review. Body `{"reviewer_name": "...", "rating": 1-5, "comment": "..."}`. Fails with 400 if the reviewer already reviewed the book.
+- `PUT /books/{book_id}` — Replace a book using the same shape as `POST /books` (authors overwritten).
+- `PUT /books/{book_id}/authors` — Replace the book’s author list. Body is an array of author IDs, e.g., `[3,4]`.
+- `PATCH /books/{book_id}` — Partial update. Any subset of `title`, `year`, `book_isbn`, `genre_name`, `description`.
+- `DELETE /books/{book_id}` — Delete book and cascade-delete its reviews. 204 on success.
+
+### Authors
+- `GET /authors` — List authors. Query: `q` (unaccented similarity on name/email), `name`, `email`, `limit` (1–100, default 20), `offset` (default 0). Returns `[{id, name, email}]`.
+- `GET /authors/{author_id}` — Single author. Returns `{id, name, email}`; 404 if missing.
+- `GET /authors/{author_id}/books` — Books for an author. Returns `[{id, title, year}]`.
+- `POST /authors` — Create author. Body `{"name": "...", "email": "...", "book_ids": [1,2]}` (book IDs optional; must exist if provided).
+- `PUT /authors/{author_id}` — Replace author with same shape as `POST /authors` (books overwritten).
+- `PATCH /authors/{author_id}` — Partial update. `book_ids` is optional; when provided, it replaces the list (empty list clears all).
+- `DELETE /authors/{author_id}` — Delete author. 204 on success.
+
+### Reviews
+- `DELETE /reviews/{review_id}` — Delete a review by id. 204 on success.
