@@ -1,11 +1,12 @@
 # Library Service (FastAPI + Postgres + Redis)
 
-Production-oriented API for managing authors, books, and reviews. Uses FastAPI with SQLAlchemy (sync), PostgreSQL for storage, and Redis for caching list/detail reads with cache-version invalidation.
+Production-oriented API for managing authors, books, and reviews. Uses FastAPI with SQLAlchemy (async), PostgreSQL for storage, and Redis for caching list/detail reads with cache-version invalidation. Deployed and exercised against App Runner + RDS + ElastiCache (TLS).
 
 ## Stack and Capabilities
-- FastAPI, Uvicorn, Pydantic v2.
-- SQLAlchemy 2.x (sync) with PostgreSQL; migrations via Alembic.
-- Redis caching (per-entity entries + versioned list caches).
+- FastAPI + Uvicorn, Pydantic v2.
+- SQLAlchemy 2.x (async) with PostgreSQL (RDS in production); migrations via Alembic.
+- Redis caching (ElastiCache Redis, TLS, cluster-safe deletes to avoid CROSSSLOT), per-entity + versioned list caches.
+- Containerized image deployed via AWS App Runner with VPC connector to RDS/Redis.
 - Author/book/review CRUD, full-text-ish search with similarity filters, cursor/offset pagination for books.
 
 ## Running the API
@@ -24,31 +25,36 @@ APP_PORT=8000
 3) Apply migrations (inside the app container): `alembic upgrade head`
 4) API available at `http://localhost:8000` (docs at `/docs`).
 
-### Local (without containers)
-1) Install Python 3.11+ and dependencies: `pip install -r requirements.txt`
-2) Provide `DATABASE_URL` (e.g., `postgresql+psycopg://postgres:123456@localhost:5432/library_app`) and `REDIS_HOST`/`REDIS_PORT` via env or `.env`.
-3) Run migrations: `alembic upgrade head`
-4) Start the server: `uvicorn main:app --host 0.0.0.0 --port 8000 --reload`
+### App Runner + RDS + ElastiCache (deployed)
+- Image: `681802564174.dkr.ecr.ap-southeast-2.amazonaws.com/library-app:latest`
+- DB: RDS Postgres, `DATABASE_SYNC_URL` / `DATABASE_ASYNC_URL` point to RDS.
+- Redis: ElastiCache Redis (TLS required) with `REDIS_URL=rediss://<endpoint>:6379/0`.
+- Start command can use Dockerfile CMD, or `sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"` if you want migrations on startup.
 
 ## Caching Notes
 - Keys: `author:{id}`, `book:{id}`, list keys with versioning (`authors:list`, `books:list`).
 - TTL defaults to 300s. Mutations bump list versions and invalidate related detail/review caches.
-- Redis URL is built from `REDIS_*` envs; override with `REDIS_URL` if needed.
+- Redis URL is built from `REDIS_*` envs; override with `REDIS_URL` if needed. For Redis cluster/TLS, use `rediss://…` and single-key deletes are used to avoid CROSSSLOT errors.
 
 ## Data and Seeding
 - Generate sample payload: `python scripts/generate_big_data.py` (default synthetic 50k books to `data_feeding.txt`; toggle `FETCH_FROM_OPEN_LIBRARY` for live samples).
-- Seed the running API from that file: `python scripts/seed.py` (assumes API at `http://localhost:8000`).
+- Seed (async) from file: `python scripts/seed_file_async.py --base-url https://<your-app> --data-file data_feeding.txt --concurrency 10` (uses `.env` / `SEED_BASE_URL` if set).
+- Legacy sync seed: `python scripts/seed.py` (assumes `http://localhost:8000`).
 
 ## Development Tips
 - Migrations live in `migrations/`; use `alembic revision --autogenerate -m "msg"` then `alembic upgrade head`.
-- SQLAlchemy sessions are synchronous; plan for async migration by switching to `AsyncSession` and async drivers, and ensuring background workers (Celery/RQ/Arq) reuse Redis for cache invalidation if introduced.
+- SQLAlchemy is async in the API layer; ensure any new background workers reuse the async engine/session and Redis client.
 - Keep `pydantic` instantiation via `model_validate(..., from_attributes=True)` for ORM objects (already applied).
 
 ## Roadmap / Next Steps
-- Move to async stack (async SQLAlchemy + async Redis client).
-- Introduce background worker for heavy tasks (e.g., bulk imports, cache warming).
-- Add auth/rate limiting and request logging/metrics for production.
-- Expand tests around caching invariants and search/pagination edge cases.
+- Add auth and rate limiting; protect public endpoint (WAF/API key/JWT).
+- Add request logging/metrics and basic observability.
+- Media pipeline to S3 (covers, PDFs, avatars) with presigned URLs.
+- Add a worker for bulk imports/cache warming.
+- Expand tests around caching invariants, search/pagination edge cases, and high-concurrency writes.
+
+## Deployed / Tested
+- App Runner + RDS + ElastiCache (TLS) seeded successfully via `scripts/seed_file_async.py` with 116 authors and 50,000 books.
 
 ## API Routes and How to Call Them
 Base URL defaults to `http://localhost:8000`. All payloads are JSON; send `Content-Type: application/json`.
