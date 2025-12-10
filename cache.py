@@ -195,9 +195,13 @@ async def get_books_for_author(author_id: int, r: Redis | None = None) -> set[in
 
 async def invalidate_book(book_id: int, r: Redis | None = None):
     r = r or await init_redis()
-    await r.delete(make_book_key(book_id))
-    await r.delete(make_reviews_key(book_id))
-    await r.delete(f"book:{book_id}:authors")
+    # In cluster mode, delete keys individually to avoid CROSSSLOT on multi-key DEL.
+    for key in (
+        make_book_key(book_id),
+        make_reviews_key(book_id),
+        f"book:{book_id}:authors",
+    ):
+        await r.delete(key)
 
 
 async def invalidate_author(
@@ -211,8 +215,12 @@ async def invalidate_author(
         related_book_ids = {int(bid) for bid in await r.smembers(author_books_key)}
 
     if related_book_ids:
-        keys_to_delete = [make_book_key(bid) for bid in related_book_ids]
-        review_keys = [make_reviews_key(bid) for bid in related_book_ids]
-        await r.delete(*(keys_to_delete + review_keys))
+        keys_to_delete = []
+        for bid in related_book_ids:
+            keys_to_delete.append(make_book_key(bid))
+            keys_to_delete.append(make_reviews_key(bid))
+        # Delete keys one by one to avoid Redis cluster cross-slot errors.
+        for key in keys_to_delete:
+            await r.delete(key)
 
     await r.delete(author_books_key)
